@@ -4,11 +4,26 @@ import type { JobStatus } from "@/lib/types";
 
 // Redis connection (lazy init)
 let connection: IORedis | null = null;
+let redisAvailable = true;
 
 function getConnection(): IORedis {
   if (!connection) {
     connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
       maxRetriesPerRequest: null,
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 3) {
+          redisAvailable = false;
+          return null; // stop retrying
+        }
+        return Math.min(times * 500, 2000);
+      },
+    });
+    connection.on("error", () => {
+      redisAvailable = false;
+    });
+    connection.connect().catch(() => {
+      redisAvailable = false;
     });
   }
   return connection;

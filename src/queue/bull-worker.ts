@@ -3,6 +3,15 @@ import IORedis from "ioredis";
 
 const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: true,
+  retryStrategy(times) {
+    if (times > 3) return null; // stop retrying
+    return Math.min(times * 500, 2000);
+  },
+});
+connection.on("error", () => { /* suppress unhandled error spam */ });
+connection.connect().catch(() => {
+  console.warn("Redis not available — BullMQ worker will not process jobs");
 });
 
 // Cast needed: top-level ioredis and bullmq's bundled ioredis have incompatible types
