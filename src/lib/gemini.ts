@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 import { ScriptSchema } from "./schemas";
 import type { Script } from "./types";
 
@@ -28,7 +28,7 @@ export async function generateScript(
   prompt: string,
   sceneCount: number = 5
 ): Promise<Script> {
-  const jsonSchema = zodToJsonSchema(ScriptSchema, "ScriptSchema");
+  const jsonSchema = z.toJSONSchema(ScriptSchema, { target: "draft-7" });
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
