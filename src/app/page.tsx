@@ -37,54 +37,154 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="mb-12 text-center">
-        <h1 className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-5xl font-bold tracking-tight text-transparent sm:text-6xl">
-          AI Video Generator
-        </h1>
-        <p className="mx-auto mt-4 max-w-md text-lg text-gray-400">
-          Transform your ideas into stunning videos with AI. Describe what you
-          want, and we will generate it scene by scene.
+    <div className="relative min-h-screen flex flex-col">
+      {/* Animated gradient mesh background */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          background: `
+            radial-gradient(ellipse 80% 60% at 50% 20%, rgba(92, 31, 222, 0.08) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 50% at 80% 60%, rgba(21, 150, 239, 0.05) 0%, transparent 50%),
+            radial-gradient(ellipse 50% 40% at 20% 80%, rgba(149, 0, 149, 0.04) 0%, transparent 50%)
+          `,
+        }}
+      />
+
+      {/* Hero section */}
+      <main className="flex flex-1 flex-col items-center justify-center px-6 py-20">
+        <div className="mb-14 text-center animate-fade-in">
+          <h1
+            className="font-serif text-display-lg opacity-0 animate-fade-in-up"
+            style={{ animationFillMode: "forwards" }}
+          >
+            Create Videos with AI
+          </h1>
+          <p
+            className="mx-auto mt-5 max-w-2xl text-body-md opacity-0 animate-fade-in-up delay-2"
+            style={{ animationFillMode: "forwards" }}
+          >
+            Transform your ideas into cinematic video, scene by scene. Describe
+            your vision and let AI craft the script, generate the visuals, and
+            compose the final cut.
+          </p>
+        </div>
+
+        <div
+          className="w-full max-w-3xl opacity-0 animate-fade-in-up delay-3"
+          style={{ animationFillMode: "forwards" }}
+        >
+          <PromptInput onSubmit={handleSubmit} isLoading={isLoading} />
+        </div>
+
+        {error && (
+          <div className="mt-5 w-full max-w-3xl rounded-lg border border-[var(--error-container)] bg-[var(--error-container)]/10 px-4 py-3 text-sm text-[var(--error)]">
+            {error}
+          </div>
+        )}
+      </main>
+
+      {/* How It Works section */}
+      <section className="px-6 pb-24 pt-8">
+        <h2
+          className="font-serif text-headline-lg text-center mb-12 opacity-0 animate-fade-in-up delay-4"
+          style={{ animationFillMode: "forwards" }}
+        >
+          How It Works
+        </h2>
+
+        <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-3">
+          {[
+            {
+              step: "01",
+              icon: (
+                <svg
+                  className="h-7 w-7"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                  />
+                </svg>
+              ),
+              title: "Describe",
+              description:
+                "Write a prompt describing the video you envision. Set your resolution and scene count.",
+              delay: "delay-4",
+            },
+            {
+              step: "02",
+              icon: (
+                <svg
+                  className="h-7 w-7"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
+                  />
+                </svg>
+              ),
+              title: "Generate",
+              description:
+                "AI writes the script, generates video clips for each scene, and adds narration.",
+              delay: "delay-5",
+            },
+            {
+              step: "03",
+              icon: (
+                <svg
+                  className="h-7 w-7"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                  />
+                </svg>
+              ),
+              title: "Download",
+              description:
+                "Preview your composed video in the browser, then download the final MP4.",
+              delay: "delay-6",
+            },
+          ].map((item) => (
+            <div
+              key={item.step}
+              className={`rounded-xl bg-[#1b1b20] p-8 transition-all duration-200 hover:bg-[#2a292f] hover:scale-[1.02] opacity-0 animate-fade-in-up ${item.delay}`}
+              style={{ animationFillMode: "forwards" }}
+            >
+              <div className="mb-4 flex items-center gap-3 text-[var(--primary)]">
+                {item.icon}
+                <span className="text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-[var(--outline)]">
+                  Step {item.step}
+                </span>
+              </div>
+              <h3 className="font-serif text-headline-md mb-2">{item.title}</h3>
+              <p className="text-body-md">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="pb-8 text-center">
+        <p className="text-sm text-[var(--outline)]">
+          Powered by Gemini, Veo, and Remotion
         </p>
-      </div>
-
-      <PromptInput onSubmit={handleSubmit} isLoading={isLoading} />
-
-      {error && (
-        <div className="mt-4 w-full max-w-2xl rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          {error}
-        </div>
-      )}
-
-      <div className="mt-16 grid max-w-2xl grid-cols-1 gap-6 text-center sm:grid-cols-3">
-        <div>
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-            1
-          </div>
-          <h3 className="text-sm font-medium text-gray-300">Describe</h3>
-          <p className="mt-1 text-xs text-gray-500">
-            Write a prompt describing your video
-          </p>
-        </div>
-        <div>
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
-            2
-          </div>
-          <h3 className="text-sm font-medium text-gray-300">Generate</h3>
-          <p className="mt-1 text-xs text-gray-500">
-            AI creates a script and video clips
-          </p>
-        </div>
-        <div>
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-400">
-            3
-          </div>
-          <h3 className="text-sm font-medium text-gray-300">Download</h3>
-          <p className="mt-1 text-xs text-gray-500">
-            Get your composed video file
-          </p>
-        </div>
-      </div>
+      </footer>
     </div>
   );
 }
