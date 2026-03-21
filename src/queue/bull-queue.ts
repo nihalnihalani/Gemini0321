@@ -19,7 +19,9 @@ let queue: Queue | null = null;
 
 export function getQueue(): Queue {
   if (!queue) {
-    queue = new Queue("video-generation", { connection: getConnection() });
+    // Cast needed: top-level ioredis and bullmq's bundled ioredis have incompatible types
+    // but are functionally identical at runtime
+    queue = new Queue("video-generation", { connection: getConnection() as never });
   }
   return queue;
 }
