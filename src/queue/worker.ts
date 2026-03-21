@@ -61,6 +61,9 @@ async function updateJobPersistent(jobId: string, updates: Partial<JobStatus>): 
 
   // Also persist to Redis if available
   try {
+    if (!(process.env.ENABLE_BULLMQ === "true" && process.env.REDIS_URL)) {
+      return;
+    }
     const { setJobStatus } = await import("./bull-queue");
     const job = jobs.get(jobId);
     if (job) await setJobStatus(jobId, job);
@@ -222,6 +225,7 @@ export async function processJob(
 
     const generatedScenes: GeneratedScene[] = [];
     let titleCardUrl = "";
+    const keyframeUrls = new Map<number, string>();
 
     // Upload Nano Banan title card if available
     if (nanoBananAssets.titleCard) {
@@ -240,7 +244,8 @@ export async function processJob(
     for (const [sceneNum, keyframePath] of nanoBananAssets.keyframes) {
       try {
         const keyframeKey = generateKey(jobId, `keyframe-${sceneNum}.png`);
-        await uploadFile(keyframePath, keyframeKey);
+        const keyframeUrl = await uploadFile(keyframePath, keyframeKey);
+        keyframeUrls.set(sceneNum, keyframeUrl);
       } catch (err) {
         console.error(
           `Keyframe upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
@@ -315,10 +320,10 @@ export async function processJob(
           soundEffectUrl: sfxUrls.get(scene.scene_number),
         });
       } else {
-        // Scene clip failed; include with empty videoUrl
+        // Fall back to a keyframe image if Veo did not produce a clip.
         generatedScenes.push({
           ...scene,
-          videoUrl: "",
+          videoUrl: keyframeUrls.get(scene.scene_number) ?? "",
           narrationAudioUrl: narrationUrls.get(scene.scene_number),
           soundEffectUrl: sfxUrls.get(scene.scene_number),
         });

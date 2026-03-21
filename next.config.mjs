@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   serverExternalPackages: [
     "@remotion/bundler",
     "@remotion/renderer",
@@ -9,6 +8,7 @@ const nextConfig: NextConfig = {
     "bullmq",
     "ioredis",
   ],
+  allowedDevOrigins: ["127.0.0.1"],
 };
 
 export default nextConfig;

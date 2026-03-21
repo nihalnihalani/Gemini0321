@@ -1,5 +1,7 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { readFile } from "fs/promises";
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { createReadStream } from "fs";
+import { copyFile, mkdir } from "fs/promises";
 import path from "path";
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -11,9 +13,37 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webm": "video/webm",
   ".gif": "image/gif",
+  ".svg": "image/svg+xml",
 };
 
-let supabase: SupabaseClient | null = null;
+const LOCAL_ASSET_ROOT = "/tmp/gemini-video-gen-assets";
+
+function getLocalStorageKey(localPath: string, key: string): string {
+  const sourceExt = path.extname(localPath).toLowerCase();
+  const targetExt = path.extname(key).toLowerCase();
+
+  if (sourceExt && targetExt && sourceExt !== targetExt) {
+    return `${key.slice(0, -targetExt.length)}${sourceExt}`;
+  }
+
+  return key;
+}
+
+let s3Client: S3Client | null = null;
+
+function getAppBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
+export function isS3Configured(): boolean {
+  return Boolean(
+    process.env.S3_ENDPOINT &&
+      process.env.S3_ACCESS_KEY_ID &&
+      process.env.S3_SECRET_ACCESS_KEY &&
+      process.env.S3_BUCKET_NAME &&
+      process.env.S3_PUBLIC_URL
+  );
+}
 
 function getEnvVar(name: string): string {
   const value = process.env[name];
@@ -23,25 +53,23 @@ function getEnvVar(name: string): string {
   return value;
 }
 
-function getSupabaseClient(): SupabaseClient {
-  if (!supabase) {
-    supabase = createClient(
-      getEnvVar("NEXT_PUBLIC_SUPABASE_URL"),
-      getEnvVar("SUPABASE_SERVICE_ROLE_KEY")
-    );
-  }
-  return supabase;
+function getBucketName(): string {
+  return getEnvVar("S3_BUCKET_NAME");
 }
 
-function getBucketName(): string {
-  return process.env.SUPABASE_STORAGE_BUCKET || "video-assets";
+function getPublicBaseUrl(): string {
+  return getEnvVar("S3_PUBLIC_URL");
 }
 
 export function getPublicUrl(key: string): string {
-  const { data } = getSupabaseClient()
-    .storage.from(getBucketName())
-    .getPublicUrl(key);
-  return data.publicUrl;
+  if (!isS3Configured()) {
+    return `${getAppBaseUrl()}/api/assets/${key}`;
+  }
+  return `${getPublicBaseUrl()}/${key}`;
+}
+
+export function getLocalAssetPath(key: string): string {
+  return path.join(LOCAL_ASSET_ROOT, key);
 }
 
 export function generateKey(jobId: string, filename: string): string {
@@ -52,31 +80,40 @@ export async function uploadFile(
   localPath: string,
   key: string
 ): Promise<string> {
+  if (!isS3Configured()) {
+    const localKey = getLocalStorageKey(localPath, key);
+    const outputPath = getLocalAssetPath(localKey);
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await copyFile(localPath, outputPath);
+    return getPublicUrl(localKey);
+  }
+
   const ext = path.extname(localPath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
+  const upload = new Upload({
+    client: getS3Client(),
+    params: {
+      Bucket: getBucketName(),
+      Key: key,
+      Body: createReadStream(localPath),
+      ContentType: contentType,
+    },
+  });
 
-  const fileBuffer = await readFile(localPath);
-
-  const { error } = await getSupabaseClient()
-    .storage.from(getBucketName())
-    .upload(key, fileBuffer, {
-      contentType,
-      upsert: true,
-    });
-
-  if (error) {
-    throw new Error(`Failed to upload file: ${error.message}`);
-  }
+  await upload.done();
 
   return getPublicUrl(key);
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .storage.from(getBucketName())
-    .remove([key]);
-
-  if (error) {
-    throw new Error(`Failed to delete file: ${error.message}`);
+  if (!isS3Configured()) {
+    return;
   }
+
+  await getS3Client().send(
+    new DeleteObjectCommand({
+      Bucket: getBucketName(),
+      Key: key,
+    })
+  );
 }
