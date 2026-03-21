@@ -7,14 +7,14 @@
 </p>
 
 <h1 align="center">TeleStudio</h1>
-<h3 align="center">AI-Powered Video Production &mdash; From Telegram Prompt to MP4 in Minutes</h3>
+<h3 align="center">Autonomous AI Video Agent &mdash; From Telegram Prompt to MP4 in Minutes</h3>
 
 <p align="center">
-  An autonomous video generation platform that compresses a multi-day studio workflow into a single chat message. It orchestrates Gemini 2.5 Flash as the "Director", Veo 3.1 as the "Cinematographer", and ElevenLabs as the "Voice Actor", stitching everything together via Remotion directly from Telegram.
+  A multi-agent video production studio that compresses a multi-day studio workflow into a single chat message. It orchestrates Gemini 2.5 Flash as the "Director Agent", Veo 3.1 as the "Cinematographer", and ElevenLabs as the "Voice Actor", stitching everything together via Remotion directly from Telegram.
 </p>
 
 <p align="center">
-  <a href="https://cerebralvalley.ai/"><strong>Submission for the Cerebral Valley Hackathon | March 2026</strong></a>
+  <a href="https://cerebralvalley.ai/e/zero-to-agent-sf"><strong>Submission for Zero to Agent: Vercel x DeepMind Hackathon | San Francisco, March 2026</strong></a>
 </p>
 
 ---
@@ -52,14 +52,14 @@
 
 ## Multimodal Pipeline Showcase
 
-This project deliberately showcases **cutting-edge AI integration** orchestrated through a seamless developer experience:
+This project answers the "Zero to Agent" challenge by taking full advantage of Vercel's agent stack infrastructure and Gemini's multimodal reasoning to create a tool people actually want to use:
 
 | Role | Technology | What It Does |
 |------|------------|--------------|
 | **The Interface** | Vercel Chat SDK (`@chat-adapter/telegram`) | Replaces complex Telegram API boilerplate with a beautiful, unified developer experience for handling direct messages and webhooks. |
-| **The Director** | Google Gemini 2.5 Flash | Uses strict Zod schemas to output a highly structured, scene-by-scene script with visual descriptions, camera directions, and TTS narration. |
-| **The Cinematographer** | Google Veo 3.1 | Translates Gemini's hyper-detailed visual prompts into breathtaking, cinematic video clips matching the required mood and duration. |
-| **The Voice Actor** | ElevenLabs | Generates incredibly realistic, emotional voiceovers perfectly synced to the generated script. |
+| **Director Agent** | Google Gemini 2.5 Flash | Uses strict Zod schemas to output a highly structured, scene-by-scene script with visual descriptions, camera directions, and TTS narration. |
+| **Cinematographer Agent** | Google Veo 3.1 | Translates Gemini's hyper-detailed visual prompts into breathtaking, cinematic video clips matching the required mood and duration. |
+| **Voice Actor Agent** | ElevenLabs | Generates incredibly realistic, emotional voiceovers perfectly synced to the generated script. |
 | **The Editor** | Remotion | Programmatically stitches the Veo video clips and ElevenLabs audio together server-side into a final, exportable MP4 file. |
 | **The Studio** | Supabase MCP | Provides storage buckets to seamlessly host the intermediate video and audio assets during the rendering pipeline. |
 
@@ -81,11 +81,11 @@ graph TB
         RemotionRender["Remotion renderMedia()"]
     end
 
-    subgraph Director["The Director (Gemini)"]
+    subgraph Director["Director Agent (Gemini)"]
         Gemini["Gemini 2.5 Flash<br/><code>Structured Zod Output</code>"]
     end
 
-    subgraph Production["Production Crew (Parallel Generation)"]
+    subgraph Production["Production Crew Agents"]
         direction LR
         Veo["Google Veo 3.1<br/><code>Cinematic Clips</code>"]
         Audio["ElevenLabs<br/><code>TTS Voiceover</code>"]
@@ -242,5 +242,5 @@ MIT
 ---
 
 <p align="center">
-  <strong>TeleStudio</strong> &mdash; Built for the <a href="https://cerebralvalley.ai/">Cerebral Valley Hackathon</a>, March 2026.
+  <strong>TeleStudio</strong> &mdash; Built for the <a href="https://cerebralvalley.ai/e/zero-to-agent-sf">Zero to Agent: Vercel x DeepMind Hackathon</a> in San Francisco, March 2026.
 </p>
