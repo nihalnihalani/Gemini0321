@@ -25,9 +25,15 @@ export async function GET(request: Request) {
           // Try BullMQ first, fall back to in-memory
           let status;
           try {
-            const { getJobStatus: getBullStatus } = await import("@/queue/bull-queue");
-            status = await getBullStatus(jobId);
+            if (process.env.ENABLE_BULLMQ === "true" && process.env.REDIS_URL) {
+              const { getJobStatus: getBullStatus } = await import("@/queue/bull-queue");
+              status = await getBullStatus(jobId);
+            }
           } catch {
+            // Ignore and fall back to in-memory
+          }
+
+          if (!status) {
             const { getJobStatus: getMemStatus } = await import("@/queue/worker");
             status = getMemStatus(jobId);
           }

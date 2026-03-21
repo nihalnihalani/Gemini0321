@@ -6,6 +6,7 @@ import { generateMusic } from "@/lib/lyria";
 import { renderVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
 import { mkdir } from "fs/promises";
+import path from "path";
 import type {
   JobStatus,
   SceneProgress,
@@ -15,7 +16,14 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_STYLE } from "@/lib/types";
 
-const jobs = new Map<string, JobStatus>();
+// Persist the jobs Map on global so it survives Next.js hot module reloads in dev.
+declare global {
+  // eslint-disable-next-line no-var
+  var __jobsMap: Map<string, JobStatus> | undefined;
+}
+
+const jobs: Map<string, JobStatus> =
+  global.__jobsMap ?? (global.__jobsMap = new Map());
 
 export { jobs };
 
@@ -61,6 +69,9 @@ async function updateJobPersistent(jobId: string, updates: Partial<JobStatus>): 
 
   // Also persist to Redis if available
   try {
+    if (!(process.env.ENABLE_BULLMQ === "true" && process.env.REDIS_URL)) {
+      return;
+    }
     const { setJobStatus } = await import("./bull-queue");
     const job = jobs.get(jobId);
     if (job) await setJobStatus(jobId, job);
@@ -222,11 +233,13 @@ export async function processJob(
 
     const generatedScenes: GeneratedScene[] = [];
     let titleCardUrl = "";
+    const keyframeUrls = new Map<number, string>();
 
     // Upload Nano Banan title card if available
     if (nanoBananAssets.titleCard) {
       try {
-        const titleCardKey = generateKey(jobId, "title-card.png");
+        const titleCardExt = path.extname(nanoBananAssets.titleCard) || ".png";
+        const titleCardKey = generateKey(jobId, `title-card${titleCardExt}`);
         titleCardUrl = await uploadFile(nanoBananAssets.titleCard, titleCardKey);
         console.log(`Title card uploaded: ${titleCardUrl}`);
       } catch (err) {
@@ -239,8 +252,10 @@ export async function processJob(
     // Upload Nano Banan keyframes if available
     for (const [sceneNum, keyframePath] of nanoBananAssets.keyframes) {
       try {
-        const keyframeKey = generateKey(jobId, `keyframe-${sceneNum}.png`);
-        await uploadFile(keyframePath, keyframeKey);
+        const keyframeExt = path.extname(keyframePath) || ".png";
+        const keyframeKey = generateKey(jobId, `keyframe-${sceneNum}${keyframeExt}`);
+        const keyframeUrl = await uploadFile(keyframePath, keyframeKey);
+        keyframeUrls.set(sceneNum, keyframeUrl);
       } catch (err) {
         console.error(
           `Keyframe upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
@@ -293,10 +308,8 @@ export async function processJob(
           await updateJobPersistent(jobId, { scenes: job.scenes });
         }
 
-        const key = generateKey(
-          jobId,
-          `scene-${scene.scene_number}.mp4`
-        );
+        const clipExt = path.extname(clip.clipPath) || ".mp4";
+        const key = generateKey(jobId, `scene-${scene.scene_number}${clipExt}`);
         const videoUrl = await uploadFile(clip.clipPath, key);
 
         if (job?.scenes) {
@@ -315,10 +328,10 @@ export async function processJob(
           soundEffectUrl: sfxUrls.get(scene.scene_number),
         });
       } else {
-        // Scene clip failed; include with empty videoUrl
+        // Fall back to a keyframe image if Veo did not produce a clip.
         generatedScenes.push({
           ...scene,
-          videoUrl: "",
+          videoUrl: keyframeUrls.get(scene.scene_number) ?? "",
           narrationAudioUrl: narrationUrls.get(scene.scene_number),
           soundEffectUrl: sfxUrls.get(scene.scene_number),
         });

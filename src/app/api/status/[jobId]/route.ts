@@ -10,8 +10,10 @@ export async function GET(
   // Try BullMQ (Redis) first, fall back to in-memory
   let status;
   try {
-    const { getJobStatus: getBullStatus } = await import("@/queue/bull-queue");
-    status = await getBullStatus(jobId);
+    if (process.env.ENABLE_BULLMQ === "true" && process.env.REDIS_URL) {
+      const { getJobStatus: getBullStatus } = await import("@/queue/bull-queue");
+      status = await getBullStatus(jobId);
+    }
   } catch {
     // Redis not available, use in-memory
   }

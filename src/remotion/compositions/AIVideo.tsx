@@ -39,6 +39,7 @@ export const AIVideo: React.FC<AIVideoProps> = ({
           <TitleSequence
             title={script.title}
             theme={script.theme}
+            imageUrl={script.titleCardUrl}
             compositionStyle={compositionStyle}
           />
         </Series.Sequence>

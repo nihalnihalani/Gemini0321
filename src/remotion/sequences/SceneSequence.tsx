@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   Audio,
   OffthreadVideo,
+  Img,
   useCurrentFrame,
   interpolate,
 } from "remotion";
@@ -22,6 +23,9 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
   useCaptions = false,
 }) => {
   const frame = useCurrentFrame();
+  const isImageAsset =
+    !!scene.videoUrl &&
+    /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(scene.videoUrl);
 
   const titleOpacity =
     scene.scene_number === 1
@@ -33,10 +37,41 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
   return (
     <AbsoluteFill>
       <AbsoluteFill>
-        <OffthreadVideo
-          src={scene.videoUrl}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
+        {scene.videoUrl ? (
+          isImageAsset ? (
+            <Img
+              src={scene.videoUrl}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <OffthreadVideo
+              src={scene.videoUrl}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          )
+        ) : (
+          <AbsoluteFill
+            style={{
+              background:
+                "linear-gradient(135deg, #0f172a 0%, #1d4ed8 45%, #0f172a 100%)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 80,
+            }}
+          >
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: 56,
+                fontWeight: 700,
+                textAlign: "center",
+                textShadow: "0 4px 16px rgba(0,0,0,0.45)",
+              }}
+            >
+              {scene.title}
+            </div>
+          </AbsoluteFill>
+        )}
       </AbsoluteFill>
 
       {compositionStyle.overlayOpacity > 0 && (

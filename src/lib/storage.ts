@@ -11,6 +11,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webm": "video/webm",
   ".gif": "image/gif",
+  ".svg": "image/svg+xml",
 };
 
 let supabase: SupabaseClient | null = null;
