@@ -2,7 +2,8 @@ import React from "react";
 import { Composition, registerRoot } from "remotion";
 import { z } from "zod";
 import { AIVideo, type AIVideoProps } from "./compositions/AIVideo";
-import type { GeneratedScript } from "../lib/types";
+import { type GeneratedScript, DEFAULT_STYLE } from "../lib/types";
+import { CompositionStyleSchema } from "../lib/schemas";
 
 const sceneSchema = z.object({
   scene_number: z.number(),
@@ -29,6 +30,7 @@ const scriptSchema = z.object({
 
 const propsSchema = z.object({
   script: scriptSchema,
+  compositionStyle: CompositionStyleSchema.optional(),
 });
 
 const FPS = 30;
@@ -75,7 +77,7 @@ const RemotionRoot: React.FC = () => {
         width={1920}
         height={1080}
         schema={propsSchema}
-        defaultProps={{ script: defaultScript }}
+        defaultProps={{ script: defaultScript, compositionStyle: DEFAULT_STYLE }}
         calculateMetadata={({ props }) => {
           return {
             durationInFrames: Math.round(

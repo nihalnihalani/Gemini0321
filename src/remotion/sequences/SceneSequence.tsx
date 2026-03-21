@@ -6,13 +6,17 @@ import {
   interpolate,
 } from "remotion";
 import { TextOverlay } from "../components/TextOverlay";
-import type { GeneratedScene } from "../../lib/types";
+import { type GeneratedScene, type CompositionStyle, DEFAULT_STYLE } from "../../lib/types";
 
 interface SceneSequenceProps {
   scene: GeneratedScene;
+  compositionStyle?: CompositionStyle;
 }
 
-export const SceneSequence: React.FC<SceneSequenceProps> = ({ scene }) => {
+export const SceneSequence: React.FC<SceneSequenceProps> = ({
+  scene,
+  compositionStyle = DEFAULT_STYLE,
+}) => {
   const frame = useCurrentFrame();
 
   const titleOpacity =
@@ -31,11 +35,40 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({ scene }) => {
         />
       </AbsoluteFill>
 
-      <TextOverlay text={scene.narration_text} style="subtitle" />
+      {compositionStyle.overlayOpacity > 0 && (
+        <AbsoluteFill
+          style={{
+            backgroundColor: compositionStyle.overlayColor,
+            opacity: compositionStyle.overlayOpacity,
+          }}
+        />
+      )}
+
+      <TextOverlay text={scene.narration_text} style="subtitle" compositionStyle={compositionStyle} />
 
       {scene.scene_number === 1 && (
         <AbsoluteFill style={{ opacity: titleOpacity }}>
-          <TextOverlay text={scene.title} style="title" />
+          <TextOverlay text={scene.title} style="title" compositionStyle={compositionStyle} />
+        </AbsoluteFill>
+      )}
+
+      {compositionStyle.showWatermark && compositionStyle.watermarkText && (
+        <AbsoluteFill
+          style={{
+            justifyContent: "flex-end",
+            alignItems: "flex-end",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              color: "rgba(255, 255, 255, 0.5)",
+              fontSize: 14,
+              fontFamily: "sans-serif",
+            }}
+          >
+            {compositionStyle.watermarkText}
+          </div>
         </AbsoluteFill>
       )}
     </AbsoluteFill>
