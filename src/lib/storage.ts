@@ -1,11 +1,11 @@
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
-import { createReadStream } from "fs";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { readFile } from "fs/promises";
 import path from "path";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".mp4": "video/mp4",
   ".wav": "audio/wav",
+  ".mp3": "audio/mpeg",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -13,7 +13,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".gif": "image/gif",
 };
 
-let s3Client: S3Client | null = null;
+let supabase: SupabaseClient | null = null;
 
 function getEnvVar(name: string): string {
   const value = process.env[name];
@@ -23,31 +23,25 @@ function getEnvVar(name: string): string {
   return value;
 }
 
-function getS3Client(): S3Client {
-  if (!s3Client) {
-    s3Client = new S3Client({
-      endpoint: getEnvVar("S3_ENDPOINT"),
-      credentials: {
-        accessKeyId: getEnvVar("S3_ACCESS_KEY_ID"),
-        secretAccessKey: getEnvVar("S3_SECRET_ACCESS_KEY"),
-      },
-      region: "auto",
-      forcePathStyle: true,
-    });
+function getSupabaseClient(): SupabaseClient {
+  if (!supabase) {
+    supabase = createClient(
+      getEnvVar("NEXT_PUBLIC_SUPABASE_URL"),
+      getEnvVar("SUPABASE_SERVICE_ROLE_KEY")
+    );
   }
-  return s3Client;
+  return supabase;
 }
 
 function getBucketName(): string {
-  return getEnvVar("S3_BUCKET_NAME");
-}
-
-function getPublicBaseUrl(): string {
-  return getEnvVar("S3_PUBLIC_URL");
+  return process.env.SUPABASE_STORAGE_BUCKET || "video-assets";
 }
 
 export function getPublicUrl(key: string): string {
-  return `${getPublicBaseUrl()}/${key}`;
+  const { data } = getSupabaseClient()
+    .storage.from(getBucketName())
+    .getPublicUrl(key);
+  return data.publicUrl;
 }
 
 export function generateKey(jobId: string, filename: string): string {
@@ -61,26 +55,28 @@ export async function uploadFile(
   const ext = path.extname(localPath).toLowerCase();
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
 
-  const upload = new Upload({
-    client: getS3Client(),
-    params: {
-      Bucket: getBucketName(),
-      Key: key,
-      Body: createReadStream(localPath),
-      ContentType: contentType,
-    },
-  });
+  const fileBuffer = await readFile(localPath);
 
-  await upload.done();
+  const { error } = await getSupabaseClient()
+    .storage.from(getBucketName())
+    .upload(key, fileBuffer, {
+      contentType,
+      upsert: true,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload file: ${error.message}`);
+  }
 
   return getPublicUrl(key);
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  await getS3Client().send(
-    new DeleteObjectCommand({
-      Bucket: getBucketName(),
-      Key: key,
-    })
-  );
+  const { error } = await getSupabaseClient()
+    .storage.from(getBucketName())
+    .remove([key]);
+
+  if (error) {
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
 }
