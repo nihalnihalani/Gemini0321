@@ -50,18 +50,28 @@ export async function generateNarration(
 
   const audio = await elevenlabs.textToSpeech.convert(voiceId, {
     text,
-    model_id: modelId,
-    voice_settings: {
+    modelId,
+    voiceSettings: {
       stability,
-      similarity_boost: similarityBoost,
+      similarityBoost,
     },
   });
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of audio) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  const reader = audio.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
   }
-  await writeFile(outputPath, Buffer.concat(chunks));
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  await writeFile(outputPath, result);
 
   return outputPath;
 }
