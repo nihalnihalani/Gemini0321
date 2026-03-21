@@ -226,6 +226,7 @@ async function processJob(
       stage: "completed",
       progress: 100,
       message: "Video generation completed",
+      generatedScript,
       previewUrl: firstSuccessful?.videoUrl,
       downloadUrl,
     });

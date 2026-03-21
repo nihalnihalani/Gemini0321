@@ -2,8 +2,15 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, Suspense } from "react";
-import type { JobStatus } from "@/lib/types";
+import dynamic from "next/dynamic";
+import type { JobStatus, CompositionStyle } from "@/lib/types";
+import { DEFAULT_STYLE } from "@/lib/types";
 import GenerationProgress from "@/components/GenerationProgress";
+import EditPanel from "@/components/EditPanel";
+
+const VideoPreview = dynamic(() => import("@/components/VideoPreview"), {
+  ssr: false,
+});
 
 function GenerateContent() {
   const searchParams = useSearchParams();
@@ -11,6 +18,8 @@ function GenerateContent() {
   const jobId = searchParams.get("jobId");
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compositionStyle, setCompositionStyle] =
+    useState<CompositionStyle>(DEFAULT_STYLE);
 
   const fetchStatus = useCallback(async () => {
     if (!jobId) return;
@@ -43,6 +52,10 @@ function GenerateContent() {
     return () => clearInterval(interval);
   }, [jobId, fetchStatus]);
 
+  const handleStyleChange = (style: CompositionStyle, _explanation: string) => {
+    setCompositionStyle(style);
+  };
+
   if (!jobId) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
@@ -57,6 +70,50 @@ function GenerateContent() {
     );
   }
 
+  // Completed state with edit UI
+  if (status?.stage === "completed" && status.generatedScript) {
+    return (
+      <div className="flex min-h-screen flex-col px-4 py-6 sm:px-8">
+        <button
+          onClick={() => router.push("/")}
+          className="mb-6 self-start rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition hover:bg-white/10 hover:text-white"
+        >
+          &larr; Back
+        </button>
+
+        <div className="flex flex-1 flex-col gap-6 lg:flex-row">
+          {/* Left: Video Preview */}
+          <div className="flex-1 lg:flex-[2]">
+            <VideoPreview
+              script={status.generatedScript}
+              style={compositionStyle}
+            />
+            {/* Download link */}
+            {status.downloadUrl && (
+              <div className="mt-4">
+                <a
+                  href={status.downloadUrl}
+                  className="inline-block rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-6 py-3 text-sm font-medium text-white transition hover:from-blue-600 hover:to-violet-600"
+                >
+                  Download Video
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Edit Panel */}
+          <div className="h-[500px] lg:h-auto lg:flex-1">
+            <EditPanel
+              currentStyle={compositionStyle}
+              onStyleChange={handleStyleChange}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // In-progress / error / loading states
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <button

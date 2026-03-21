@@ -50,6 +50,7 @@ export interface JobStatus {
   message: string;
   scenes?: SceneProgress[];
   script?: Script;
+  generatedScript?: GeneratedScript;
   previewUrl?: string;
   downloadUrl?: string;
   error?: string;
