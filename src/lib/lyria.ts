@@ -1,5 +1,6 @@
 import { mkdir, access, writeFile, readdir } from "fs/promises";
 import path from "path";
+import { GoogleGenAI } from "@google/genai";
 
 export interface MusicConfig {
   durationSeconds: number;
@@ -16,6 +17,58 @@ async function ensureLyriaDir(): Promise<void> {
   } catch {
     await mkdir(LYRIA_DIR, { recursive: true });
   }
+}
+
+function tempoToBpm(tempo?: "slow" | "medium" | "fast"): number {
+  switch (tempo) {
+    case "slow":
+      return 70;
+    case "fast":
+      return 130;
+    case "medium":
+    default:
+      return 100;
+  }
+}
+
+function writePcmToWav(
+  pcmData: Buffer,
+  outputPath: string,
+  sampleRate: number,
+  channels: number
+): Buffer {
+  const bitsPerSample = 16;
+  const bytesPerSample = bitsPerSample / 8;
+  const blockAlign = channels * bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = pcmData.length;
+  const headerSize = 44;
+
+  const wavBuffer = Buffer.alloc(headerSize + dataSize);
+
+  // RIFF header
+  wavBuffer.write("RIFF", 0);
+  wavBuffer.writeUInt32LE(headerSize + dataSize - 8, 4);
+  wavBuffer.write("WAVE", 8);
+
+  // fmt sub-chunk
+  wavBuffer.write("fmt ", 12);
+  wavBuffer.writeUInt32LE(16, 16); // sub-chunk size
+  wavBuffer.writeUInt16LE(1, 20); // PCM format
+  wavBuffer.writeUInt16LE(channels, 22);
+  wavBuffer.writeUInt32LE(sampleRate, 24);
+  wavBuffer.writeUInt32LE(byteRate, 28);
+  wavBuffer.writeUInt16LE(blockAlign, 32);
+  wavBuffer.writeUInt16LE(bitsPerSample, 34);
+
+  // data sub-chunk
+  wavBuffer.write("data", 36);
+  wavBuffer.writeUInt32LE(dataSize, 40);
+
+  // Copy PCM data after header
+  pcmData.copy(wavBuffer, headerSize);
+
+  return wavBuffer;
 }
 
 export async function generateMusic(
@@ -40,12 +93,120 @@ export async function generateWithLyria(
     throw new Error("GEMINI_API_KEY is not set — cannot use Lyria API");
   }
 
-  // Lyria RealTime API is WebSocket-based and experimental (v1alpha).
-  // This stub allows us to swap in real Lyria support later without
-  // changing the interface.
-  throw new Error(
-    "Lyria RealTime API not yet implemented \u2014 using fallback"
-  );
+  await ensureLyriaDir();
+
+  const client = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    apiVersion: "v1alpha",
+  });
+
+  const sampleRate = 44100;
+  const channels = 2;
+  const bytesPerSample = 2; // 16-bit
+  const targetBytes = config.durationSeconds * sampleRate * channels * bytesPerSample;
+  const timeoutMs = (config.durationSeconds + 10) * 1000;
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  const audioPromise = new Promise<Buffer>((resolve, reject) => {
+    let sessionRef: any = null;
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        if (sessionRef) {
+          try { sessionRef.close(); } catch { /* ignore */ }
+        }
+        if (totalBytes > 0) {
+          resolve(Buffer.concat(chunks));
+        } else {
+          reject(new Error("Lyria RealTime timed out with no audio data"));
+        }
+      }
+    }, timeoutMs);
+
+    client.live.music.connect({
+      model: "models/lyria-realtime-exp",
+      callbacks: {
+        onmessage: (message: any) => {
+          if (message.serverContent?.audioChunks) {
+            for (const chunk of message.serverContent.audioChunks) {
+              const buf = Buffer.from(chunk.data, "base64");
+              chunks.push(buf);
+              totalBytes += buf.length;
+
+              if (totalBytes >= targetBytes && !settled) {
+                settled = true;
+                clearTimeout(timer);
+                if (sessionRef) {
+                  try { sessionRef.close(); } catch { /* ignore */ }
+                }
+                resolve(Buffer.concat(chunks));
+              }
+            }
+          }
+        },
+        onerror: (error: any) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
+        },
+        onclose: () => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            if (totalBytes > 0) {
+              resolve(Buffer.concat(chunks));
+            } else {
+              reject(new Error("Lyria RealTime session closed with no audio data"));
+            }
+          }
+        },
+      },
+    }).then(async (session: any) => {
+      sessionRef = session;
+
+      await session.setWeightedPrompts({
+        weightedPrompts: [
+          { text: prompt, weight: 1.0 },
+        ],
+      });
+
+      await session.setMusicGenerationConfig({
+        musicGenerationConfig: {
+          bpm: tempoToBpm(config.tempo),
+          temperature: 1.0,
+          audioFormat: "pcm16",
+          sampleRateHz: sampleRate,
+        },
+      });
+
+      await session.play();
+    }).catch((err: any) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
+  });
+
+  const pcmData = await audioPromise;
+
+  // Trim to exact target length if we got more data than needed
+  const trimmed = pcmData.length > targetBytes
+    ? pcmData.subarray(0, targetBytes)
+    : pcmData;
+
+  const wavBuffer = writePcmToWav(trimmed, "", sampleRate, channels);
+  const outputPath = path.join(LYRIA_DIR, `music-${Date.now()}.wav`);
+  await writeFile(outputPath, wavBuffer);
+
+  return outputPath;
 }
 
 export async function getPlaceholderMusic(
@@ -87,7 +248,7 @@ export async function getPlaceholderMusic(
   await writeFile(outputPath, buffer);
 
   console.warn(
-    "Using silent placeholder audio \u2014 configure Lyria API or add royalty-free music to public/music/"
+    "Using silent placeholder audio — configure Lyria API or add royalty-free music to public/music/"
   );
 
   return outputPath;
