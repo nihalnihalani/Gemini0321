@@ -1,6 +1,7 @@
 import { generateScript } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
+import { generateAllNarrations } from "@/lib/elevenlabs";
 import { generateMusic } from "@/lib/lyria";
 import { renderVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
@@ -176,6 +177,24 @@ export async function processJob(
       message: `Generated ${successfulClips.length}/${script.scenes.length} clips`,
     });
 
+    // Generate narration audio for all scenes (non-critical)
+    let narrationMap = new Map<number, string>();
+    try {
+      await updateJobPersistent(jobId, {
+        progress: 53,
+        message: "Generating narration audio...",
+      });
+
+      narrationMap = await generateAllNarrations(script.scenes);
+      console.log(
+        `Narration generation complete: ${narrationMap.size}/${script.scenes.length} scenes`
+      );
+    } catch (err) {
+      console.error(
+        `Narration generation failed: ${err instanceof Error ? err.message : err}`
+      );
+    }
+
     // Stage 3: Upload assets (55-70%)
     await updateJobPersistent(jobId, {
       stage: "uploading_assets",
@@ -207,6 +226,21 @@ export async function processJob(
       } catch (err) {
         console.error(
           `Keyframe upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
+        );
+      }
+    }
+
+    // Upload narration audio files
+    const narrationUrls = new Map<number, string>();
+    for (const [sceneNum, narrationPath] of narrationMap) {
+      try {
+        const narrationKey = generateKey(jobId, `narration-${sceneNum}.mp3`);
+        const narrationUrl = await uploadFile(narrationPath, narrationKey);
+        narrationUrls.set(sceneNum, narrationUrl);
+        console.log(`Narration for scene ${sceneNum} uploaded: ${narrationUrl}`);
+      } catch (err) {
+        console.error(
+          `Narration upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
         );
       }
     }
@@ -244,12 +278,14 @@ export async function processJob(
           ...scene,
           videoUrl,
           videoLocalPath: clip.clipPath,
+          narrationAudioUrl: narrationUrls.get(scene.scene_number),
         });
       } else {
         // Scene clip failed; include with empty videoUrl
         generatedScenes.push({
           ...scene,
           videoUrl: "",
+          narrationAudioUrl: narrationUrls.get(scene.scene_number),
         });
       }
     }

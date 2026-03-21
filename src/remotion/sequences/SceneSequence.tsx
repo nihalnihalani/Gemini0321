@@ -1,6 +1,7 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   OffthreadVideo,
   useCurrentFrame,
   interpolate,
@@ -57,6 +58,10 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
         <AbsoluteFill style={{ opacity: titleOpacity }}>
           <TextOverlay text={scene.title} style="title" compositionStyle={compositionStyle} />
         </AbsoluteFill>
+      )}
+
+      {scene.narrationAudioUrl && (
+        <Audio src={scene.narrationAudioUrl} volume={1} />
       )}
 
       {compositionStyle.showWatermark && compositionStyle.watermarkText && (
