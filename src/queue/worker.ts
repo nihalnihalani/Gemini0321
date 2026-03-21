@@ -176,14 +176,40 @@ export async function processJob(
       message: `Generated ${successfulClips.length}/${script.scenes.length} clips`,
     });
 
-    // Stage 3: Upload assets
+    // Stage 3: Upload assets (55-70%)
     await updateJobPersistent(jobId, {
       stage: "uploading_assets",
-      progress: 60,
+      progress: 55,
       message: "Uploading assets to storage...",
     });
 
     const generatedScenes: GeneratedScene[] = [];
+    let titleCardUrl = "";
+
+    // Upload Nano Banan title card if available
+    if (nanoBananAssets.titleCard) {
+      try {
+        const titleCardKey = generateKey(jobId, "title-card.png");
+        titleCardUrl = await uploadFile(nanoBananAssets.titleCard, titleCardKey);
+        console.log(`Title card uploaded: ${titleCardUrl}`);
+      } catch (err) {
+        console.error(
+          `Title card upload failed: ${err instanceof Error ? err.message : err}`
+        );
+      }
+    }
+
+    // Upload Nano Banan keyframes if available
+    for (const [sceneNum, keyframePath] of nanoBananAssets.keyframes) {
+      try {
+        const keyframeKey = generateKey(jobId, `keyframe-${sceneNum}.png`);
+        await uploadFile(keyframePath, keyframeKey);
+      } catch (err) {
+        console.error(
+          `Keyframe upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
+        );
+      }
+    }
 
     for (const scene of script.scenes) {
       const clip = successfulClips.find(
@@ -229,15 +255,14 @@ export async function processJob(
     }
 
     await updateJobPersistent(jobId, {
-      progress: 80,
+      progress: 70,
       message: "Assets uploaded",
     });
 
-    // Stage 4: Compose video (MVP: mark as ready)
+    // Stage 4: Generate music (70-75%)
     await updateJobPersistent(jobId, {
-      stage: "composing_video",
-      progress: 90,
-      message: "Composing final video...",
+      progress: 70,
+      message: "Generating background music...",
     });
 
     const generatedScript: GeneratedScript = {
@@ -247,14 +272,68 @@ export async function processJob(
       music_prompt: script.music_prompt,
       total_duration_seconds: script.total_duration_seconds,
       scenes: generatedScenes,
+      titleCardUrl,
     };
 
-    // For MVP, use the first successful scene's URL as a preview
-    const firstSuccessful = generatedScenes.find((s) => s.videoUrl);
-    const downloadKey = generateKey(jobId, "final.mp4");
-    const downloadUrl = getPublicUrl(downloadKey);
+    try {
+      const musicPath = await generateMusic(script.music_prompt, {
+        durationSeconds: script.total_duration_seconds,
+        mood: script.scenes[0]?.mood,
+      });
+      const musicKey = generateKey(jobId, "music.wav");
+      const musicUrl = await uploadFile(musicPath, musicKey);
+      generatedScript.musicUrl = musicUrl;
+      console.log(`Music generated and uploaded: ${musicUrl}`);
+    } catch (err) {
+      console.error(
+        `Music generation failed: ${err instanceof Error ? err.message : err}`
+      );
+    }
 
-    // Stage 5: Completed
+    await updateJobPersistent(jobId, {
+      progress: 75,
+      message: "Music generated",
+    });
+
+    // Stage 5: Compose video with Remotion (75-95%)
+    await updateJobPersistent(jobId, {
+      stage: "composing_video",
+      progress: 75,
+      message: "Composing final video with Remotion...",
+    });
+
+    const renderDir = "/tmp/renders";
+    await mkdir(renderDir, { recursive: true });
+    const outputPath = `${renderDir}/${jobId}.mp4`;
+
+    let downloadUrl: string;
+    const firstSuccessful = generatedScenes.find((s) => s.videoUrl);
+
+    try {
+      const renderStart = Date.now();
+      console.log(`Starting Remotion render for job ${jobId}...`);
+
+      await renderVideo(generatedScript, DEFAULT_STYLE, outputPath);
+
+      const renderDuration = ((Date.now() - renderStart) / 1000).toFixed(1);
+      console.log(`Remotion render completed in ${renderDuration}s for job ${jobId}`);
+
+      await updateJobPersistent(jobId, {
+        progress: 95,
+        message: "Uploading final video...",
+      });
+
+      const downloadKey = generateKey(jobId, "final.mp4");
+      downloadUrl = await uploadFile(outputPath, downloadKey);
+    } catch (err) {
+      console.error(
+        `Remotion render failed: ${err instanceof Error ? err.message : err}. Using preview fallback.`
+      );
+      const downloadKey = generateKey(jobId, "final.mp4");
+      downloadUrl = getPublicUrl(downloadKey);
+    }
+
+    // Stage 6: Completed
     await updateJobPersistent(jobId, {
       stage: "completed",
       progress: 100,

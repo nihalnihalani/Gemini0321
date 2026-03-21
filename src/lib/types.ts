@@ -26,6 +26,7 @@ export interface GeneratedScene extends Scene {
 export interface GeneratedScript extends Omit<Script, "scenes"> {
   scenes: GeneratedScene[];
   musicUrl?: string;
+  titleCardUrl?: string;
 }
 
 export type JobStage =
