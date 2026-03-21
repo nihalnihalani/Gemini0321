@@ -59,10 +59,10 @@ function GenerateContent() {
   if (!jobId) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
-        <p className="text-gray-400">No job ID provided.</p>
+        <p style={{ color: "var(--outline)" }}>No job ID provided.</p>
         <button
           onClick={() => router.push("/")}
-          className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/20"
+          className="btn-ghost mt-4 text-sm"
         >
           Go Home
         </button>
@@ -73,28 +73,53 @@ function GenerateContent() {
   // Completed state with edit UI
   if (status?.stage === "completed" && status.generatedScript) {
     return (
-      <div className="flex min-h-screen flex-col px-4 py-6 sm:px-8">
+      <div className="flex min-h-screen flex-col px-4 py-6 sm:px-8 animate-fade-in">
         <button
           onClick={() => router.push("/")}
-          className="mb-6 self-start rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition hover:bg-white/10 hover:text-white"
+          className="btn-ghost mb-6 flex items-center gap-2 self-start px-3 py-1.5 text-sm"
         >
-          &larr; Back
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          Back
         </button>
 
-        <div className="flex flex-1 flex-col gap-6 lg:flex-row">
+        <div className="flex flex-1 flex-col gap-8 lg:flex-row">
           {/* Left: Video Preview */}
           <div className="flex-1 lg:flex-[2]">
             <VideoPreview
               script={status.generatedScript}
               style={compositionStyle}
             />
-            {/* Download link */}
             {status.downloadUrl && (
-              <div className="mt-4">
+              <div className="mt-6">
                 <a
                   href={status.downloadUrl}
-                  className="inline-block rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-6 py-3 text-sm font-medium text-white transition hover:from-blue-600 hover:to-violet-600"
+                  className="btn-primary inline-flex items-center gap-2 text-sm"
                 >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"
+                    />
+                  </svg>
                   Download Video
                 </a>
               </div>
@@ -118,16 +143,36 @@ function GenerateContent() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <button
         onClick={() => router.push("/")}
-        className="absolute left-4 top-4 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition hover:bg-white/10 hover:text-white sm:left-8 sm:top-8"
+        className="btn-ghost absolute left-4 top-4 flex items-center gap-2 px-3 py-1.5 text-sm sm:left-8 sm:top-8"
       >
-        &larr; Back
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        Back
       </button>
 
-      <h1 className="mb-2 text-2xl font-bold text-white">Generating Video</h1>
-      <p className="mb-8 text-sm text-gray-500">Job: {jobId}</p>
+      <h1 className="text-headline-lg mb-2">Generating Your Video</h1>
+      <p className="text-label-md mb-8">Job: {jobId}</p>
 
       {error && !status && (
-        <div className="w-full max-w-2xl rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div
+          className="w-full max-w-2xl rounded-lg px-4 py-3 text-sm"
+          style={{
+            background: "rgba(147, 0, 10, 0.15)",
+            border: "1px solid rgba(255, 180, 171, 0.2)",
+            color: "var(--error)",
+          }}
+        >
           {error}
         </div>
       )}
@@ -137,14 +182,14 @@ function GenerateContent() {
       {status?.stage === "failed" && (
         <button
           onClick={() => router.push("/")}
-          className="mt-6 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-6 py-3 font-medium text-white transition hover:from-blue-600 hover:to-violet-600"
+          className="btn-primary mt-6 text-sm"
         >
           Try Again
         </button>
       )}
 
       {!status && !error && (
-        <div className="flex items-center gap-2 text-gray-400">
+        <div className="flex items-center gap-2" style={{ color: "var(--primary)" }}>
           <svg
             className="h-5 w-5 animate-spin"
             viewBox="0 0 24 24"
@@ -175,7 +220,10 @@ export default function GeneratePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center text-gray-400">
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{ color: "var(--outline)" }}
+        >
           Loading...
         </div>
       }

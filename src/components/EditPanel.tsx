@@ -78,49 +78,60 @@ export default function EditPanel({
     onStyleChange(DEFAULT_STYLE, "Reset to default style");
   };
 
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   return (
-    <div className="flex h-full flex-col rounded-xl border border-gray-700/50 bg-gray-900">
+    <div className="glass-card flex h-full flex-col animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-        <h2 className="text-sm font-semibold text-white">Edit with AI</h2>
-        <div className="flex gap-1.5">
-          <button
-            onClick={handleUndo}
-            disabled={history.length === 0}
-            className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-gray-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            Undo
-          </button>
-          <button
-            onClick={handleReset}
-            className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-gray-400 transition hover:bg-white/10 hover:text-white"
-          >
-            Reset
-          </button>
-        </div>
+      <div
+        className="px-5 py-4"
+        style={{ borderBottom: "1px solid rgba(73, 68, 86, 0.15)" }}
+      >
+        <h2 className="text-headline-md">Style Editor</h2>
       </div>
 
       {/* History */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
         {history.length === 0 && (
           <div className="flex h-full items-center justify-center">
-            <p className="text-center text-sm text-gray-600">
-              Describe how you want to change the video style.
-              <br />
-              <span className="text-gray-700">
-                e.g. &quot;Make the title bigger and blue&quot;
-              </span>
+            <p
+              className="text-center text-sm"
+              style={{ color: "var(--outline)" }}
+            >
+              Describe how you&apos;d like to edit the video style
             </p>
           </div>
         )}
         {history.map((entry, i) => (
-          <div key={i} className="space-y-1.5">
-            <div className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-300">
+          <div
+            key={i}
+            className="animate-fade-in space-y-2"
+            style={{ animationDelay: `${i * 0.05}s` }}
+          >
+            {/* User bubble */}
+            <div
+              className="rounded-lg px-3.5 py-2.5 text-sm"
+              style={{
+                background: "var(--surface-container-high)",
+                color: "var(--on-surface)",
+              }}
+            >
               {entry.instruction}
             </div>
-            <div className="rounded-lg bg-gray-800/50 px-3 py-2 text-xs text-gray-400">
+            {/* AI explanation */}
+            <p
+              className="px-1 text-xs"
+              style={{ color: "var(--on-surface-variant)" }}
+            >
               {entry.explanation}
-            </div>
+            </p>
+            {/* Timestamp */}
+            <span className="text-label-md block px-1" style={{ fontSize: "0.625rem" }}>
+              {formatTime(entry.timestamp)}
+            </span>
           </div>
         ))}
         <div ref={historyEndRef} />
@@ -128,14 +139,32 @@ export default function EditPanel({
 
       {/* Error */}
       {error && (
-        <div className="mx-4 mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="mx-5 mb-2 text-xs" style={{ color: "#ffb4ab" }}>
           {error}
         </div>
       )}
 
-      {/* Input */}
-      <div className="border-t border-gray-800 p-3">
-        <div className="flex gap-2">
+      {/* Bottom action bar */}
+      <div
+        className="px-5 py-4"
+        style={{ borderTop: "1px solid rgba(73, 68, 86, 0.15)" }}
+      >
+        {/* Undo / Reset */}
+        <div className="mb-3 flex gap-2">
+          <button
+            onClick={handleUndo}
+            disabled={history.length === 0}
+            className="btn-ghost px-3 py-1.5 text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Undo
+          </button>
+          <button onClick={handleReset} className="btn-ghost px-3 py-1.5 text-xs">
+            Reset
+          </button>
+        </div>
+
+        {/* Input row */}
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={instruction}
@@ -143,16 +172,29 @@ export default function EditPanel({
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             placeholder="Make the title bigger and blue..."
             disabled={isLoading}
-            className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+            className="stage-input flex-1 disabled:opacity-50"
+            style={{
+              padding: "0.625rem 1rem",
+              fontSize: "0.875rem",
+              resize: "none",
+            }}
           />
           <button
             onClick={handleSubmit}
             disabled={!instruction.trim() || isLoading}
-            className="flex items-center justify-center rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-2 text-sm font-medium text-white transition hover:from-blue-600 hover:to-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: "linear-gradient(135deg, var(--primary), var(--primary-container))",
+              transition: "box-shadow var(--transition-base)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.boxShadow = "var(--shadow-glow)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
           >
             {isLoading ? (
               <svg
-                className="h-4 w-4 animate-spin"
+                className="h-4 w-4 animate-spin text-white"
                 viewBox="0 0 24 24"
                 fill="none"
               >
@@ -171,7 +213,19 @@ export default function EditPanel({
                 />
               </svg>
             ) : (
-              "Send"
+              <svg
+                className="h-4 w-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 12h12m-5-5l5 5-5 5"
+                />
+              </svg>
             )}
           </button>
         </div>
