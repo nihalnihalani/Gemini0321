@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
-import { getJobStatus } from "@/queue/worker";
+import { getJobStatus as getInMemoryStatus } from "@/queue/worker";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params;
-  const status = getJobStatus(jobId);
+
+  // Try BullMQ (Redis) first, fall back to in-memory
+  let status;
+  try {
+    const { getJobStatus: getBullStatus } = await import("@/queue/bull-queue");
+    status = await getBullStatus(jobId);
+  } catch {
+    // Redis not available, use in-memory
+  }
+
+  if (!status) {
+    status = getInMemoryStatus(jobId);
+  }
 
   if (!status) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });

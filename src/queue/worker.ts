@@ -1,6 +1,10 @@
 import { generateScript } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
+import { generateAllAssets } from "@/lib/nano-banan";
+import { generateMusic } from "@/lib/lyria";
+import { renderVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
+import { mkdir } from "fs/promises";
 import type {
   JobStatus,
   SceneProgress,
@@ -8,6 +12,7 @@ import type {
   GeneratedScript,
   Scene,
 } from "@/lib/types";
+import { DEFAULT_STYLE } from "@/lib/types";
 
 const jobs = new Map<string, JobStatus>();
 
@@ -49,42 +54,57 @@ function updateJob(jobId: string, updates: Partial<JobStatus>): void {
   Object.assign(job, updates, { updatedAt: new Date().toISOString() });
 }
 
-async function processJob(
+async function updateJobPersistent(jobId: string, updates: Partial<JobStatus>): Promise<void> {
+  // Update in-memory
+  updateJob(jobId, updates);
+
+  // Also persist to Redis if available
+  try {
+    const { setJobStatus } = await import("./bull-queue");
+    const job = jobs.get(jobId);
+    if (job) await setJobStatus(jobId, job);
+  } catch {
+    // Redis not available, in-memory only
+  }
+}
+
+export async function processJob(
   jobId: string,
   prompt: string,
   resolution: string,
   sceneCount: number
 ): Promise<void> {
   try {
-    // Stage 1: Generate script
-    updateJob(jobId, {
+    // Stage 1: Generate script (5-15%)
+    await updateJobPersistent(jobId, {
       stage: "generating_script",
-      progress: 10,
+      progress: 5,
       message: "Generating script with Gemini...",
     });
 
     const script = await generateScript(prompt, sceneCount);
 
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       script,
-      progress: 20,
+      progress: 15,
       message: "Script generated successfully",
     });
 
-    // Stage 2: Generate video clips
+    // Stage 2: Generate video clips + Nano Banan assets in parallel (15-55%)
     const sceneProgresses: SceneProgress[] = script.scenes.map((s) => ({
       scene_number: s.scene_number,
       status: "pending" as const,
     }));
 
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       stage: "generating_clips",
-      progress: 25,
-      message: "Generating video clips...",
+      progress: 15,
+      message: "Generating video clips and assets...",
       scenes: sceneProgresses,
     });
 
-    const clipResults = await Promise.allSettled(
+    // Run Veo clip generation and Nano Banan asset generation in parallel
+    const clipGenerationPromise = Promise.allSettled(
       script.scenes.map(async (scene: Scene) => {
         // Mark scene as generating
         const job = jobs.get(jobId);
@@ -93,7 +113,7 @@ async function processJob(
             (s) => s.scene_number === scene.scene_number
           );
           if (sp) sp.status = "generating";
-          updateJob(jobId, { scenes: job.scenes });
+          await updateJobPersistent(jobId, { scenes: job.scenes });
         }
 
         const clipPath = await generateVideoClip(scene, {
@@ -106,14 +126,27 @@ async function processJob(
             (s) => s.scene_number === scene.scene_number
           );
           if (sp) sp.status = "done";
-          updateJob(jobId, { scenes: job.scenes });
+          await updateJobPersistent(jobId, { scenes: job.scenes });
         }
 
         return { sceneNumber: scene.scene_number, clipPath };
       })
     );
 
-    // Calculate how many succeeded
+    // Nano Banan asset generation (non-critical — failures are tolerated)
+    const nanoBananPromise = generateAllAssets(script).catch((err) => {
+      console.error(
+        `Nano Banan asset generation failed: ${err instanceof Error ? err.message : err}`
+      );
+      return { titleCard: "", keyframes: new Map<number, string>() };
+    });
+
+    const [clipResults, nanoBananAssets] = await Promise.all([
+      clipGenerationPromise,
+      nanoBananPromise,
+    ]);
+
+    // Calculate how many clips succeeded
     const successfulClips: { sceneNumber: number; clipPath: string }[] = [];
     for (let i = 0; i < clipResults.length; i++) {
       const result = clipResults[i];
@@ -132,19 +165,19 @@ async function processJob(
                 ? result.reason.message
                 : String(result.reason);
           }
-          updateJob(jobId, { scenes: job.scenes });
+          await updateJobPersistent(jobId, { scenes: job.scenes });
         }
       }
     }
 
-    const clipProgress = 25 + (successfulClips.length / script.scenes.length) * 30;
-    updateJob(jobId, {
+    const clipProgress = 15 + (successfulClips.length / script.scenes.length) * 40;
+    await updateJobPersistent(jobId, {
       progress: Math.round(clipProgress),
       message: `Generated ${successfulClips.length}/${script.scenes.length} clips`,
     });
 
     // Stage 3: Upload assets
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       stage: "uploading_assets",
       progress: 60,
       message: "Uploading assets to storage...",
@@ -164,7 +197,7 @@ async function processJob(
             (s) => s.scene_number === scene.scene_number
           );
           if (sp) sp.status = "uploading";
-          updateJob(jobId, { scenes: job.scenes });
+          await updateJobPersistent(jobId, { scenes: job.scenes });
         }
 
         const key = generateKey(
@@ -178,7 +211,7 @@ async function processJob(
             (s) => s.scene_number === scene.scene_number
           );
           if (sp) sp.status = "done";
-          updateJob(jobId, { scenes: job.scenes });
+          await updateJobPersistent(jobId, { scenes: job.scenes });
         }
 
         generatedScenes.push({
@@ -195,13 +228,13 @@ async function processJob(
       }
     }
 
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       progress: 80,
       message: "Assets uploaded",
     });
 
     // Stage 4: Compose video (MVP: mark as ready)
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       stage: "composing_video",
       progress: 90,
       message: "Composing final video...",
@@ -222,7 +255,7 @@ async function processJob(
     const downloadUrl = getPublicUrl(downloadKey);
 
     // Stage 5: Completed
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       stage: "completed",
       progress: 100,
       message: "Video generation completed",
@@ -231,7 +264,7 @@ async function processJob(
       downloadUrl,
     });
   } catch (error) {
-    updateJob(jobId, {
+    await updateJobPersistent(jobId, {
       stage: "failed",
       message:
         error instanceof Error ? error.message : "An unknown error occurred",

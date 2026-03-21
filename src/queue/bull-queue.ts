@@ -1,0 +1,54 @@
+import { Queue } from "bullmq";
+import IORedis from "ioredis";
+import type { JobStatus } from "@/lib/types";
+
+// Redis connection (lazy init)
+let connection: IORedis | null = null;
+
+function getConnection(): IORedis {
+  if (!connection) {
+    connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", {
+      maxRetriesPerRequest: null,
+    });
+  }
+  return connection;
+}
+
+// Job queue
+let queue: Queue | null = null;
+
+export function getQueue(): Queue {
+  if (!queue) {
+    queue = new Queue("video-generation", { connection: getConnection() });
+  }
+  return queue;
+}
+
+// Job status store (backed by Redis)
+export async function setJobStatus(jobId: string, status: JobStatus): Promise<void> {
+  await getConnection().set(`job:${jobId}`, JSON.stringify(status), "EX", 86400); // 24h TTL
+}
+
+export async function getJobStatus(jobId: string): Promise<JobStatus | null> {
+  const data = await getConnection().get(`job:${jobId}`);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function createJob(prompt: string, resolution: string, sceneCount: number): Promise<string> {
+  const jobId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const status: JobStatus = {
+    jobId,
+    stage: "queued",
+    progress: 0,
+    message: "Job queued",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await setJobStatus(jobId, status);
+  await getQueue().add("generate-video", { jobId, prompt, resolution, sceneCount });
+
+  return jobId;
+}

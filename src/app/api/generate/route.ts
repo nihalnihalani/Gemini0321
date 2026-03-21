@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { GenerateRequestSchema } from "@/lib/schemas";
-import { createJob } from "@/queue/worker";
+import { createJob as createInMemoryJob } from "@/queue/worker";
 import type { GenerateResponse } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -16,7 +16,15 @@ export async function POST(request: Request) {
     }
 
     const { prompt, resolution, sceneCount } = parsed.data;
-    const jobId = createJob(prompt, resolution, sceneCount);
+
+    let jobId: string;
+    try {
+      const { createJob: createBullJob } = await import("@/queue/bull-queue");
+      jobId = await createBullJob(prompt, resolution, sceneCount);
+    } catch {
+      // Fall back to in-memory
+      jobId = createInMemoryJob(prompt, resolution, sceneCount);
+    }
 
     const response: GenerateResponse = {
       jobId,
