@@ -1,27 +1,36 @@
-import { Chat } from "chat";
-import { createTelegramAdapter } from "@chat-adapter/telegram";
-import { createRedisState } from "@chat-adapter/state-redis";
-import type { Thread, Message } from "chat";
-import type { TelegramMessage } from "@chat-adapter/telegram";
-import { createJob, getJobStatus } from "@/queue/worker";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-export const bot = new Chat({
-  userName: "gemini_vercel_bot",
-  adapters: {
-    telegram: createTelegramAdapter(),
-  },
-  state: createRedisState(),
-});
+let _bot: any = null;
+let _handlersRegistered = false;
+
+export async function getBot(): Promise<any> {
+  if (_bot) return _bot;
+
+  const { Chat } = await import("chat");
+  const { createTelegramAdapter } = await import("@chat-adapter/telegram");
+  const { createRedisState } = await import("@chat-adapter/state-redis");
+
+  _bot = new Chat({
+    userName: "gemini_vercel_bot",
+    adapters: {
+      telegram: createTelegramAdapter(),
+    },
+    state: createRedisState(),
+  });
+
+  return _bot;
+}
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_WAIT_MS = 10 * 60 * 1000;
 
 async function generateAndSendVideo(
-  thread: Thread,
-  message: Message,
+  thread: any,
+  message: any,
   prompt: string
 ) {
-  const chatId = (message.raw as TelegramMessage).chat.id;
+  const { createJob, getJobStatus } = await import("@/queue/worker");
+  const chatId = message.raw?.chat?.id;
 
   await thread.post(
     `🎬 Generating video for:\n"${prompt}"\n\nThis takes about 30–60 seconds, please wait...`
@@ -37,7 +46,6 @@ async function generateAndSendVideo(
     const status = getJobStatus(jobId);
     if (!status) continue;
 
-    // Send a progress update when the stage changes
     if (status.stage !== lastStage) {
       lastStage = status.stage;
       const stageLabel: Record<string, string> = {
@@ -56,27 +64,27 @@ async function generateAndSendVideo(
         `✅ Done! Your video is ready:\n${status.downloadUrl}`
       );
 
-      // Send the actual video file via Telegram sendVideo
-      const telegramRes = await fetch(
-        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendVideo`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            video: status.downloadUrl,
-            caption: status.generatedScript?.title
-              ? `🎬 ${status.generatedScript.title}`
-              : "🎬 Your AI-generated video",
-            supports_streaming: true,
-          }),
-        }
-      );
+      if (chatId && process.env.TELEGRAM_BOT_TOKEN) {
+        const telegramRes = await fetch(
+          `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendVideo`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              video: status.downloadUrl,
+              caption: status.generatedScript?.title
+                ? `🎬 ${status.generatedScript.title}`
+                : "🎬 Your AI-generated video",
+              supports_streaming: true,
+            }),
+          }
+        );
 
-      if (!telegramRes.ok) {
-        // sendVideo can fail if Telegram can't fetch the URL (e.g. too large)
-        const err = await telegramRes.json().catch(() => ({}));
-        console.warn("sendVideo failed:", err);
+        if (!telegramRes.ok) {
+          const err = await telegramRes.json().catch(() => ({}));
+          console.warn("sendVideo failed:", err);
+        }
       }
       return;
     }
@@ -90,24 +98,29 @@ async function generateAndSendVideo(
   await thread.post("⏰ Generation timed out. Please try again.");
 }
 
-// First mention / DM — subscribe thread and start generating
-bot.onNewMention(async (thread, message) => {
-  await thread.subscribe();
+export async function registerBotHandlers() {
+  if (_handlersRegistered) return;
+  _handlersRegistered = true;
 
-  const prompt = message.text.replace(/^\/start\s*/i, "").trim();
-  if (!prompt) {
-    await thread.post(
-      "Hello! Send me a description of the video you want to create and I'll generate it for you. 🎬"
-    );
-    return;
-  }
+  const bot = await getBot();
 
-  await generateAndSendVideo(thread, message, prompt);
-});
+  bot.onNewMention(async (thread: any, message: any) => {
+    await thread.subscribe();
 
-// Follow-up messages in subscribed threads — treat each as a new generation request
-bot.onSubscribedMessage(async (thread, message) => {
-  const prompt = message.text.trim();
-  if (!prompt) return;
-  await generateAndSendVideo(thread, message, prompt);
-});
+    const prompt = message.text.replace(/^\/start\s*/i, "").trim();
+    if (!prompt) {
+      await thread.post(
+        "Hello! Send me a description of the video you want to create and I'll generate it for you. 🎬"
+      );
+      return;
+    }
+
+    await generateAndSendVideo(thread, message, prompt);
+  });
+
+  bot.onSubscribedMessage(async (thread: any, message: any) => {
+    const prompt = message.text.trim();
+    if (!prompt) return;
+    await generateAndSendVideo(thread, message, prompt);
+  });
+}

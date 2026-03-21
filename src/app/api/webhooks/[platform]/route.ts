@@ -1,21 +1,27 @@
 import { after } from "next/server";
-import { bot } from "@/lib/bot";
-
-type Platform = keyof typeof bot.webhooks;
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ platform: string }> }
 ) {
   const { platform } = await params;
-  const handler = bot.webhooks[platform as Platform];
+
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    return new Response("Bot not configured", { status: 503 });
+  }
+
+  const { getBot, registerBotHandlers } = await import("@/lib/bot");
+  await registerBotHandlers();
+  const bot = await getBot();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handler = (bot as any).webhooks?.[platform];
 
   if (!handler) {
     return new Response(`Unknown platform adapter: ${platform}`, { status: 404 });
   }
 
-  // Respond 200 immediately to Telegram, process the message asynchronously
   return handler(request, {
-    waitUntil: (task) => after(() => task),
+    waitUntil: (task: Promise<unknown>) => after(() => task),
   });
 }
