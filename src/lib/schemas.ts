@@ -60,5 +60,37 @@ export const GenerateRequestSchema = z.object({
   sceneCount: z.number().min(3).max(8).optional().default(5),
 });
 
+export const CompositionStyleSchema = z.object({
+  titleFontSize: z.number().min(12).max(200).describe("Title text font size in pixels"),
+  titleColor: z.string().describe("Title text color as hex (e.g. #ffffff)"),
+  titleFontFamily: z.string().describe("Title font family (e.g. sans-serif, serif, monospace)"),
+  showTitle: z.boolean().describe("Whether to show the title overlay on the first scene"),
+  subtitleFontSize: z.number().min(12).max(100).describe("Subtitle text font size in pixels"),
+  subtitleColor: z.string().describe("Subtitle text color as hex"),
+  subtitleBgColor: z.string().describe("Subtitle background color as hex"),
+  subtitleBgOpacity: z.number().min(0).max(1).describe("Subtitle background opacity (0-1)"),
+  subtitlePosition: z.enum(["top", "center", "bottom"]).describe("Subtitle vertical position"),
+  showSubtitles: z.boolean().describe("Whether to show subtitle overlays"),
+  transitionType: z
+    .enum(["cut", "fade", "dissolve", "wipe", "per-scene"])
+    .describe("Transition type between scenes. 'per-scene' uses each scene's own transition setting"),
+  transitionDurationFrames: z
+    .number()
+    .min(0)
+    .max(60)
+    .describe("Transition duration in frames (at 30fps)"),
+  musicVolume: z.number().min(0).max(1).describe("Background music volume (0-1)"),
+  overlayColor: z.string().describe("Color overlay/tint on video as hex"),
+  overlayOpacity: z.number().min(0).max(0.8).describe("Color overlay opacity (0 = no overlay, 0.8 = heavy tint)"),
+  watermarkText: z.string().describe("Watermark text to display"),
+  showWatermark: z.boolean().describe("Whether to show watermark"),
+});
+
+export const EditRequestSchema = z.object({
+  instruction: z.string().min(1).max(1000),
+  currentStyle: CompositionStyleSchema,
+});
+
 export type ScriptOutput = z.infer<typeof ScriptSchema>;
 export type SceneOutput = z.infer<typeof SceneSchema>;
+export type CompositionStyleOutput = z.infer<typeof CompositionStyleSchema>;

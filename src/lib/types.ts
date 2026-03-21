@@ -57,6 +57,74 @@ export interface JobStatus {
   updatedAt: string;
 }
 
+export interface CompositionStyle {
+  // Title overlay
+  titleFontSize: number;
+  titleColor: string;
+  titleFontFamily: string;
+  showTitle: boolean;
+
+  // Subtitle overlay
+  subtitleFontSize: number;
+  subtitleColor: string;
+  subtitleBgColor: string;
+  subtitleBgOpacity: number;
+  subtitlePosition: "top" | "center" | "bottom";
+  showSubtitles: boolean;
+
+  // Transition overrides
+  transitionType: "cut" | "fade" | "dissolve" | "wipe" | "per-scene";
+  transitionDurationFrames: number;
+
+  // Music
+  musicVolume: number;
+
+  // Color overlay / tint
+  overlayColor: string;
+  overlayOpacity: number;
+
+  // Watermark
+  watermarkText: string;
+  showWatermark: boolean;
+}
+
+export const DEFAULT_STYLE: CompositionStyle = {
+  titleFontSize: 72,
+  titleColor: "#ffffff",
+  titleFontFamily: "sans-serif",
+  showTitle: true,
+  subtitleFontSize: 36,
+  subtitleColor: "#ffffff",
+  subtitleBgColor: "#000000",
+  subtitleBgOpacity: 0.6,
+  subtitlePosition: "bottom",
+  showSubtitles: true,
+  transitionType: "per-scene",
+  transitionDurationFrames: 15,
+  musicVolume: 0.3,
+  overlayColor: "#000000",
+  overlayOpacity: 0,
+  watermarkText: "",
+  showWatermark: false,
+};
+
+export interface EditRequest {
+  instruction: string;
+  currentStyle: CompositionStyle;
+}
+
+export interface EditResponse {
+  style: CompositionStyle;
+  explanation: string;
+}
+
+export interface EditHistoryEntry {
+  instruction: string;
+  style: CompositionStyle;
+  explanation: string;
+  timestamp: string;
+}
+
 export interface GenerateRequest {
   prompt: string;
   resolution?: "720p" | "1080p";
