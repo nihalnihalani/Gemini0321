@@ -11,7 +11,7 @@ export async function renderVideo(
 ): Promise<string> {
   // 1. Bundle the Remotion project
   const bundled = await bundle({
-    entryPoint: path.resolve(process.cwd(), "src/remotion/index.ts"),
+    entryPoint: path.resolve(process.cwd(), "src/remotion/Root.tsx"),
     webpackOverride: (config) => config,
   });
 

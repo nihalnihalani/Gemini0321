@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { mkdir, access } from "fs/promises";
+import { mkdir, access, writeFile } from "fs/promises";
 import path from "path";
 import type { Scene } from "./types";
 
@@ -14,7 +14,17 @@ const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 const CLIP_DIR = "/tmp/veo-clips";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+function isStubMode(): boolean {
+  return process.env.VEO_STUB_MODE !== "off";
+}
+
+function getAiClient(): GoogleGenAI {
+  const apiKey = process.env.VEO_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing Veo/Gemini API key");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 async function ensureClipDir(): Promise<void> {
   try {
@@ -24,15 +34,57 @@ async function ensureClipDir(): Promise<void> {
   }
 }
 
+async function createStubSceneAsset(scene: Scene): Promise<string> {
+  await ensureClipDir();
+
+  const filePath = path.join(CLIP_DIR, `scene-${scene.scene_number}.svg`);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#0f172a" />
+          <stop offset="50%" stop-color="#1d4ed8" />
+          <stop offset="100%" stop-color="#020617" />
+        </linearGradient>
+      </defs>
+      <rect width="1920" height="1080" fill="url(#bg)" />
+      <text x="960" y="450" text-anchor="middle" fill="#ffffff" font-size="76" font-family="Arial, sans-serif" font-weight="700">
+        ${escapeXml(scene.title)}
+      </text>
+      <text x="960" y="560" text-anchor="middle" fill="#dbeafe" font-size="36" font-family="Arial, sans-serif">
+        ${escapeXml(scene.mood)}
+      </text>
+    </svg>
+  `.trim();
+
+  await writeFile(filePath, svg, "utf8");
+  return filePath;
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
 export async function generateVideoClip(
   scene: Scene,
   config?: VeoConfig
 ): Promise<string> {
+  if (isStubMode()) {
+    return createStubSceneAsset(scene);
+  }
+
   await ensureClipDir();
 
   const model = config?.model ?? DEFAULT_MODEL;
   const aspectRatio = config?.aspectRatio ?? "16:9";
   const resolution = config?.resolution ?? "720p";
+
+  const ai = getAiClient();
 
   let operation = await ai.models.generateVideos({
     model,

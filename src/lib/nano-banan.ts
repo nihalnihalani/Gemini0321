@@ -6,7 +6,17 @@ import type { Scene, Script } from "./types";
 const MODEL = "gemini-3-pro-image-preview";
 const OUTPUT_DIR = "/tmp/nano-banan";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+function isStubMode(): boolean {
+  return process.env.NANO_BANAN_STUB_MODE === "on" || process.env.VEO_STUB_MODE !== "off";
+}
+
+function getAiClient(): GoogleGenAI {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Missing GEMINI_API_KEY");
+  }
+
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+}
 
 async function ensureOutputDir(): Promise<void> {
   try {
@@ -22,6 +32,14 @@ async function generateAndSaveImage(
 ): Promise<string> {
   await ensureOutputDir();
 
+  if (isStubMode()) {
+    const filePath = path.join(OUTPUT_DIR, filename.replace(/\.\w+$/, ".svg"));
+    const svg = buildPlaceholderSvg(filename.replace(/\.\w+$/, ""), prompt);
+    await writeFile(filePath, svg, "utf8");
+    return filePath;
+  }
+
+  const ai = getAiClient();
   const response = await ai.models.generateContent({
     model: MODEL,
     contents: prompt,
@@ -37,6 +55,41 @@ async function generateAndSaveImage(
   await writeFile(filePath, Buffer.from(part.inlineData.data, "base64"));
 
   return filePath;
+}
+
+function buildPlaceholderSvg(title: string, prompt: string): string {
+  const safeTitle = escapeXml(title.replaceAll("-", " "));
+  const safePrompt = escapeXml(prompt.slice(0, 180));
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#111827" />
+          <stop offset="50%" stop-color="#2563eb" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+      </defs>
+      <rect width="1920" height="1080" fill="url(#bg)" />
+      <text x="960" y="430" text-anchor="middle" fill="#ffffff" font-size="80" font-family="Arial, sans-serif" font-weight="700">
+        ${safeTitle}
+      </text>
+      <foreignObject x="260" y="500" width="1400" height="220">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="color:#dbeafe;font-size:32px;font-family:Arial,sans-serif;text-align:center;line-height:1.4;">
+          ${safePrompt}
+        </div>
+      </foreignObject>
+    </svg>
+  `.trim();
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 export async function generateKeyframe(scene: Scene): Promise<string> {

@@ -2,6 +2,10 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import type { JobStatus } from "@/lib/types";
 
+export function isBullQueueEnabled(): boolean {
+  return process.env.ENABLE_BULLMQ === "true" && Boolean(process.env.REDIS_URL);
+}
+
 // Redis connection (lazy init)
 let connection: IORedis | null = null;
 let redisAvailable = true;

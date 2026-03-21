@@ -19,6 +19,10 @@ export async function POST(request: Request) {
 
     let jobId: string;
     try {
+      if (!(process.env.ENABLE_BULLMQ === "true" && process.env.REDIS_URL)) {
+        throw new Error("BullMQ disabled");
+      }
+
       const { createJob: createBullJob } = await import("@/queue/bull-queue");
       jobId = await createBullJob(prompt, resolution, sceneCount);
     } catch {
