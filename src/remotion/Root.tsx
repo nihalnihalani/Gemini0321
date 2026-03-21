@@ -34,6 +34,7 @@ const propsSchema = z.object({
 });
 
 const FPS = 30;
+const INTRO_OUTRO_SECONDS = 6; // 3s intro + 3s outro
 
 const defaultScript: GeneratedScript = {
   title: "Sample AI Video",
@@ -81,7 +82,7 @@ const RemotionRoot: React.FC = () => {
         calculateMetadata={({ props }) => {
           return {
             durationInFrames: Math.round(
-              props.script.total_duration_seconds * FPS
+              (props.script.total_duration_seconds + INTRO_OUTRO_SECONDS) * FPS
             ),
           };
         }}

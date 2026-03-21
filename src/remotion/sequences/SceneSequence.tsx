@@ -6,16 +6,19 @@ import {
   interpolate,
 } from "remotion";
 import { TextOverlay } from "../components/TextOverlay";
+import { CaptionRenderer } from "../components/CaptionRenderer";
 import { type GeneratedScene, type CompositionStyle, DEFAULT_STYLE } from "../../lib/types";
 
 interface SceneSequenceProps {
   scene: GeneratedScene;
   compositionStyle?: CompositionStyle;
+  useCaptions?: boolean;
 }
 
 export const SceneSequence: React.FC<SceneSequenceProps> = ({
   scene,
   compositionStyle = DEFAULT_STYLE,
+  useCaptions = false,
 }) => {
   const frame = useCurrentFrame();
 
@@ -44,7 +47,11 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
         />
       )}
 
-      <TextOverlay text={scene.narration_text} style="subtitle" compositionStyle={compositionStyle} />
+      {useCaptions ? (
+        <CaptionRenderer text={scene.narration_text} style={compositionStyle} />
+      ) : (
+        <TextOverlay text={scene.narration_text} style="subtitle" compositionStyle={compositionStyle} />
+      )}
 
       {scene.scene_number === 1 && (
         <AbsoluteFill style={{ opacity: titleOpacity }}>
