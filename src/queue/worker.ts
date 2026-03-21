@@ -1,7 +1,7 @@
 import { generateScript } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
-import { generateAllNarrations } from "@/lib/elevenlabs";
+import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
 import { generateMusic } from "@/lib/lyria";
 import { renderVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
@@ -195,6 +195,24 @@ export async function processJob(
       );
     }
 
+    // Generate sound effects for all scenes (non-critical)
+    let sfxMap = new Map<number, string>();
+    try {
+      await updateJobPersistent(jobId, {
+        progress: 54,
+        message: "Generating sound effects...",
+      });
+
+      sfxMap = await generateAllSFX(script.scenes);
+      console.log(
+        `SFX generation complete: ${sfxMap.size}/${script.scenes.length} scenes`
+      );
+    } catch (err) {
+      console.error(
+        `SFX generation failed: ${err instanceof Error ? err.message : err}`
+      );
+    }
+
     // Stage 3: Upload assets (55-70%)
     await updateJobPersistent(jobId, {
       stage: "uploading_assets",
@@ -245,6 +263,21 @@ export async function processJob(
       }
     }
 
+    // Upload SFX audio files
+    const sfxUrls = new Map<number, string>();
+    for (const [sceneNum, sfxPath] of sfxMap) {
+      try {
+        const sfxKey = generateKey(jobId, `sfx-${sceneNum}.mp3`);
+        const sfxUrl = await uploadFile(sfxPath, sfxKey);
+        sfxUrls.set(sceneNum, sfxUrl);
+        console.log(`SFX for scene ${sceneNum} uploaded: ${sfxUrl}`);
+      } catch (err) {
+        console.error(
+          `SFX upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`
+        );
+      }
+    }
+
     for (const scene of script.scenes) {
       const clip = successfulClips.find(
         (c) => c.sceneNumber === scene.scene_number
@@ -279,6 +312,7 @@ export async function processJob(
           videoUrl,
           videoLocalPath: clip.clipPath,
           narrationAudioUrl: narrationUrls.get(scene.scene_number),
+          soundEffectUrl: sfxUrls.get(scene.scene_number),
         });
       } else {
         // Scene clip failed; include with empty videoUrl
@@ -286,6 +320,7 @@ export async function processJob(
           ...scene,
           videoUrl: "",
           narrationAudioUrl: narrationUrls.get(scene.scene_number),
+          soundEffectUrl: sfxUrls.get(scene.scene_number),
         });
       }
     }

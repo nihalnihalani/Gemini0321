@@ -22,6 +22,7 @@ export interface GeneratedScene extends Scene {
   videoUrl: string;
   videoLocalPath?: string;
   narrationAudioUrl?: string;
+  soundEffectUrl?: string;
 }
 
 export interface GeneratedScript extends Omit<Script, "scenes"> {

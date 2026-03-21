@@ -64,6 +64,10 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
         <Audio src={scene.narrationAudioUrl} volume={1} />
       )}
 
+      {scene.soundEffectUrl && (
+        <Audio src={scene.soundEffectUrl} volume={0.4} />
+      )}
+
       {compositionStyle.showWatermark && compositionStyle.watermarkText && (
         <AbsoluteFill
           style={{
