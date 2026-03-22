@@ -2,7 +2,10 @@ import { AbsoluteFill, Img, OffthreadVideo, Sequence, staticFile, useCurrentFram
 import { loadFont } from "@remotion/google-fonts/Manrope";
 import { quietMotionPreset, referenceTokens } from "../../editorial/tokens";
 
-const { fontFamily: manropeFontFamily } = loadFont();
+const { fontFamily: manropeFontFamily } = loadFont("normal", {
+  weights: ["400", "600", "700"],
+  subsets: ["latin"],
+});
 import type {
   EditorialAsset,
   EditorialBeat,
