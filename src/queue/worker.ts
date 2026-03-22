@@ -884,7 +884,83 @@ async function processEditorialJob(
     // Stage 1: Build editorial spec via the engine pipeline (0-40%)
     await updateJobPersistent(jobId, {
       stage: "generating_script",
-      progress: 5,
+      progress: 3,
+      message: "Analyzing source content...",
+    });
+
+    // Detect and fetch remote content (GitHub URLs, YouTube URLs)
+    let enrichedPrompt = prompt;
+    const { parseGitHubUrl, fetchGitHubMetadata } = await import("@/lib/github");
+    const ghParsed = parseGitHubUrl(prompt);
+    if (ghParsed) {
+      await updateJobPersistent(jobId, {
+        progress: 5,
+        message: `Fetching GitHub repo: ${ghParsed.owner}/${ghParsed.repo}...`,
+      });
+      try {
+        const meta = await fetchGitHubMetadata(ghParsed.owner, ghParsed.repo);
+        enrichedPrompt = [
+          `# ${meta.name}`,
+          "",
+          meta.description,
+          "",
+          `Language: ${meta.language} | Stars: ${meta.stars}`,
+          meta.topics.length > 0 ? `Topics: ${meta.topics.join(", ")}` : "",
+          "",
+          meta.features.length > 0 ? `## Key Features\n${meta.features.map(f => `- ${f}`).join("\n")}` : "",
+          "",
+          meta.readmeContent.slice(0, 4000),
+        ].filter(Boolean).join("\n");
+        console.log(`[Editorial] Fetched GitHub repo ${ghParsed.owner}/${ghParsed.repo}: ${meta.name} (${meta.stars} stars, ${meta.language})`);
+      } catch (err) {
+        console.warn(`[Editorial] GitHub fetch failed, using URL as prompt: ${err instanceof Error ? err.message : err}`);
+      }
+    } else if (/youtube\.com|youtu\.be/.test(prompt)) {
+      await updateJobPersistent(jobId, {
+        progress: 5,
+        message: "Analyzing YouTube video...",
+      });
+      try {
+        const ytAnalysis = await analyzeYouTubeVideo(prompt);
+        enrichedPrompt = `YouTube Video Analysis:\n\n${ytAnalysis}`;
+        console.log(`[Editorial] Fetched YouTube analysis for ${prompt}`);
+      } catch (err) {
+        console.warn(`[Editorial] YouTube analysis failed, using URL as prompt: ${err instanceof Error ? err.message : err}`);
+      }
+    } else if (/^https?:\/\//.test(prompt.trim())) {
+      // Generic URL — fetch and summarize with Gemini
+      await updateJobPersistent(jobId, {
+        progress: 5,
+        message: "Fetching and analyzing URL content...",
+      });
+      try {
+        const urlRes = await fetch(prompt.trim(), {
+          headers: { "User-Agent": "AI-Video-Generator/1.0" },
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (urlRes.ok) {
+          const contentType = urlRes.headers.get("content-type") ?? "";
+          if (contentType.includes("text") || contentType.includes("json")) {
+            const rawText = await urlRes.text();
+            // Strip HTML tags for a cleaner summary
+            const cleaned = rawText
+              .replace(/<script[\s\S]*?<\/script>/gi, "")
+              .replace(/<style[\s\S]*?<\/style>/gi, "")
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 5000);
+            enrichedPrompt = `# Content from ${prompt.trim()}\n\n${cleaned}`;
+            console.log(`[Editorial] Fetched URL content from ${prompt.trim()} (${cleaned.length} chars)`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Editorial] URL fetch failed, using URL as prompt: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    await updateJobPersistent(jobId, {
+      progress: 8,
       message: "Planning editorial structure...",
     });
 
@@ -897,7 +973,7 @@ async function processEditorialJob(
       const { resolveEditorialSource } = await import("@/editorial/source");
       const { runEditorialBrainPipeline } = await import("@/lib/rocketride");
 
-      const source = resolveEditorialSource(prompt);
+      const source = resolveEditorialSource(enrichedPrompt);
       llmPlanResult = await runEditorialBrainPipeline(
         buildLLMPlanningPrompt(source),
         (token) => { updateJob(jobId, { rocketrideToken: token }); }
@@ -917,7 +993,7 @@ async function processEditorialJob(
       message: "Compiling editorial beat sheet...",
     });
 
-    const result = await buildEditorialEngineResult(prompt, {
+    const result = await buildEditorialEngineResult(enrichedPrompt, {
       brainMode: llmPlanResult ? "llm" : "rule-based",
       llmPlanResult,
       preset: "editorial-generator",
