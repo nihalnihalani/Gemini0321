@@ -11,7 +11,8 @@ const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // Store pending inputs per chat: user sends text/images, then picks a template
 interface PendingInput {
-  input: string;
+  input: string;       // full user message (used as prompt context)
+  sourceUrl?: string;  // extracted URL (YouTube/GitHub) — separate from prompt text
   inputType: SourceType;
   assets: string[];
 }
@@ -90,12 +91,19 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string) {
 
 // -- Input type detection --
 
+// Extracts the first URL found in a string
+function extractUrl(text: string): string | undefined {
+  const match = text.match(/https?:\/\/\S+/);
+  return match?.[0];
+}
+
 function detectInputType(text: string): { type: SourceType; url?: string } {
-  if (extractYouTubeId(text)) {
-    return { type: "youtube", url: text.trim() };
+  const url = extractUrl(text);
+  if (url && extractYouTubeId(url)) {
+    return { type: "youtube", url };
   }
-  if (parseGitHubUrl(text)) {
-    return { type: "github", url: text.trim() };
+  if (url && parseGitHubUrl(url)) {
+    return { type: "github", url };
   }
   return { type: "prompt" };
 }
@@ -134,7 +142,7 @@ async function processAndSendVideo(
   const jobId = createJob(pending.input, "720p", 5, {
     templateId,
     sourceType: pending.inputType,
-    sourceUrl: pending.inputType !== "prompt" ? pending.input.trim() : undefined,
+    sourceUrl: pending.sourceUrl,
     assets: pending.assets.length > 0 ? pending.assets : undefined,
   });
 
@@ -272,6 +280,7 @@ export async function handleTelegramUpdate(update: Record<string, unknown>) {
   const existing = pendingInputs.get(chatId);
   pendingInputs.set(chatId, {
     input: text,
+    sourceUrl: url,
     inputType: type,
     assets: existing?.assets ?? [],
   });
