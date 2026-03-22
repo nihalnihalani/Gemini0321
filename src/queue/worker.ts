@@ -908,10 +908,14 @@ async function processEditorialJob(
     await mkdir(renderDir, { recursive: true });
     const outputPath = `${renderDir}/${jobId}.mp4`;
 
-    const renderStart = Date.now();
-    console.log(`[Editorial] Starting Remotion render for job ${jobId}...`);
+    // Downscale to 1080p 30fps by default for faster rendering
+    const { adaptSpecToResolution } = await import("@/editorial/adapter");
+    const renderSpec = adaptSpecToResolution(result.spec, "1080p");
 
-    await renderEditorialVideo(result.spec, outputPath);
+    const renderStart = Date.now();
+    console.log(`[Editorial] Starting Remotion render for job ${jobId} (${renderSpec.meta.width}x${renderSpec.meta.height} ${renderSpec.meta.fps}fps)...`);
+
+    await renderEditorialVideo(renderSpec, outputPath);
 
     const renderDuration = ((Date.now() - renderStart) / 1000).toFixed(1);
     console.log(`[Editorial] Render completed in ${renderDuration}s for job ${jobId}`);

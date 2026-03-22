@@ -100,7 +100,7 @@ export const BrandStoryInputSchema = z.object({
 
 export const GenerateRequestSchema = z.object({
   prompt: z.string().min(10).max(2000),
-  templateId: z.enum(["custom", "product-launch", "explainer", "social-promo", "brand-story"]).optional().default("product-launch"),
+  templateId: z.enum(["custom", "product-launch", "explainer", "social-promo", "brand-story", "editorial"]).optional().default("product-launch"),
   sourceType: z.enum(["prompt", "youtube", "github"]).optional().default("prompt"),
   sourceUrl: z.string().optional(),
   assets: z.array(z.string()).optional(),

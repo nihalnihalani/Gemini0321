@@ -1,5 +1,8 @@
 import { AbsoluteFill, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame, useVideoConfig, Easing, interpolate } from "remotion";
+import { loadFont } from "@remotion/google-fonts/Manrope";
 import { quietMotionPreset, referenceTokens } from "../../editorial/tokens";
+
+const { fontFamily: manropeFontFamily } = loadFont();
 import type {
   EditorialAsset,
   EditorialBeat,
