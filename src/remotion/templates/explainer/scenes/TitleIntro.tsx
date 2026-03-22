@@ -23,97 +23,150 @@ export const TitleIntro: React.FC<TitleIntroProps> = ({
   introNarration,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
 
-  // Title spring animation
-  const titleScale = spring({
-    frame,
-    fps,
-    config: { damping: 12, stiffness: 100 },
+  // Scene fade-in
+  const sceneOpacity = interpolate(frame, [0, 15], [0, 1], {
+    extrapolateRight: "clamp",
   });
 
-  // Subtitle fade-in with delay
-  const subtitleDelay = 25;
-  const subtitleFrame = Math.max(0, frame - subtitleDelay);
-  const subtitleProgress = spring({
-    frame: subtitleFrame,
-    fps,
-    config: { damping: 14, stiffness: 80 },
-  });
-  const subtitleTranslateY = interpolate(subtitleProgress, [0, 1], [20, 0]);
-  const subtitleOpacity = interpolate(subtitleProgress, [0, 1], [0, 1]);
-
-  // Decorative line grows in
-  const lineWidth = interpolate(frame, [10, 35], [0, 160], {
+  // Scene fade-out
+  const fadeOutStart = durationInFrames - 15;
+  const sceneExit = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
+  // Title spring animation
+  const titleProgress = spring({
+    frame,
+    fps,
+    config: { damping: 14, stiffness: 80 },
+  });
+  const titleTranslateY = interpolate(titleProgress, [0, 1], [50, 0]);
+  const titleOpacity = interpolate(titleProgress, [0, 1], [0, 1]);
+
+  // Subtitle fade-in with delay
+  const subtitleDelay = 30;
+  const subtitleFrame = Math.max(0, frame - subtitleDelay);
+  const subtitleOpacity = interpolate(subtitleFrame, [0, 20], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+  const subtitleTranslateY = interpolate(subtitleFrame, [0, 20], [15, 0], {
+    extrapolateRight: "clamp",
+  });
+
+  // Decorative line grows in
+  const lineWidth = interpolate(frame, [15, 40], [0, 120], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Ambient glow pulse
+  const glowOpacity = interpolate(
+    Math.sin(frame * 0.03),
+    [-1, 1],
+    [0.03, 0.08]
+  );
+
   return (
     <AbsoluteFill
       style={{
-        background: "linear-gradient(135deg, #1a1a4e 0%, #2d1b69 50%, #1a3a5e 100%)",
-        justifyContent: "center",
-        alignItems: "center",
+        background: "linear-gradient(160deg, #0f0f2e 0%, #1a1145 40%, #0d1f3c 100%)",
+        opacity: sceneOpacity * sceneExit,
       }}
     >
+      {/* Subtle radial glow */}
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
+          position: "absolute",
+          top: "30%",
+          left: "50%",
+          width: 600,
+          height: 600,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, #6366f1, transparent 70%)",
+          opacity: glowOpacity,
+          transform: "translateX(-50%) translateY(-50%)",
+        }}
+      />
+
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
           alignItems: "center",
-          gap: 24,
-          padding: "0 80px",
         }}
       >
-        {/* Title */}
         <div
           style={{
-            fontSize: 72,
-            fontWeight: 800,
-            color: "#ffffff",
-            fontFamily: "sans-serif",
-            transform: `scale(${titleScale})`,
-            textAlign: "center",
-            lineHeight: 1.2,
-            textShadow: "0 4px 20px rgba(0, 0, 0, 0.4)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 20,
+            padding: "0 100px",
+            maxWidth: "90%",
           }}
         >
-          {title}
+          {/* Title */}
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 800,
+              color: "#ffffff",
+              fontFamily: "'Inter', system-ui, sans-serif",
+              transform: `translateY(${titleTranslateY}px)`,
+              opacity: titleOpacity,
+              textAlign: "center",
+              lineHeight: 1.15,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {title}
+          </div>
+
+          {/* Decorative line */}
+          <div
+            style={{
+              width: lineWidth,
+              height: 3,
+              background: "linear-gradient(90deg, transparent, #a855f7, transparent)",
+              borderRadius: 2,
+            }}
+          />
+
+          {/* Step count badge */}
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: "#a78bfa",
+              fontFamily: "'Inter', system-ui, sans-serif",
+              opacity: subtitleOpacity,
+              transform: `translateY(${subtitleTranslateY}px)`,
+              textAlign: "center",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              padding: "8px 20px",
+              borderRadius: 20,
+              border: "1px solid rgba(167, 139, 250, 0.2)",
+              backgroundColor: "rgba(167, 139, 250, 0.06)",
+            }}
+          >
+            {stepCount} steps
+          </div>
         </div>
+      </AbsoluteFill>
 
-        {/* Decorative line */}
-        <div
-          style={{
-            width: lineWidth,
-            height: 4,
-            background: "linear-gradient(90deg, #6366f1, #a855f7)",
-            borderRadius: 2,
-          }}
-        />
-
-        {/* Step count subtitle */}
-        <div
-          style={{
-            fontSize: 28,
-            fontWeight: 400,
-            color: "rgba(255, 255, 255, 0.7)",
-            fontFamily: "sans-serif",
-            transform: `translateY(${subtitleTranslateY}px)`,
-            opacity: subtitleOpacity,
-            textAlign: "center",
-          }}
-        >
-          {introNarration || `${stepCount} steps to understand`}
-        </div>
-      </div>
-
+      {/* Narration audio */}
       {narrationUrl && <Audio src={narrationUrl} volume={1} />}
-      {introNarration && (
+
+      {/* Captions for intro narration — only if narration exists */}
+      {introNarration && narrationUrl && (
         <NarrationCaptions
           text={introNarration}
           position="bottom"
-          activeColor="#a855f7"
+          activeColor="#c4b5fd"
+          fontSize={28}
         />
       )}
     </AbsoluteFill>
