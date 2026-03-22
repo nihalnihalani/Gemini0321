@@ -129,6 +129,8 @@ export interface EditHistoryEntry {
   timestamp: string;
 }
 
+export type GenerationEngine = "veo3" | "nano-banan" | "auto";
+
 export interface GenerateRequest {
   prompt: string;
   templateId?: TemplateId;
@@ -136,9 +138,28 @@ export interface GenerateRequest {
   sourceUrl?: string;
   assets?: string[];
   enableVeo?: boolean;
+  engine?: GenerationEngine;
   resolution?: "720p" | "1080p";
   sceneCount?: number;
 }
+
+export const ENGINE_INFO: Record<GenerationEngine, { name: string; description: string; icon: string }> = {
+  veo3: {
+    name: "Veo 3",
+    description: "AI-generated video clips per scene. Best for motion-heavy content.",
+    icon: "film",
+  },
+  "nano-banan": {
+    name: "Nano Banan Pro",
+    description: "AI-generated images per scene. Best for presentations and visual stories.",
+    icon: "image",
+  },
+  auto: {
+    name: "Auto",
+    description: "AI picks the best engine per scene. Recommended for most projects.",
+    icon: "sparkles",
+  },
+};
 
 export interface GenerateResponse {
   jobId: string;
