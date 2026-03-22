@@ -4,7 +4,7 @@ import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
 import { renderVideo, renderTemplateVideo } from "@/lib/render";
-import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
+import { uploadFile, generateKey } from "@/lib/storage";
 import { extractGitHubContent } from "@/lib/github";
 import { getTemplate } from "@/lib/templates";
 import { mkdir } from "fs/promises";
@@ -85,6 +85,14 @@ function updateJob(jobId: string, updates: Partial<JobStatus>): void {
   Object.assign(job, updates, { updatedAt: new Date().toISOString() });
 }
 
+/** Throw if the cancel endpoint has already marked this job as failed. */
+function checkCancelled(jobId: string): void {
+  const job = jobs.get(jobId);
+  if (job?.stage === "failed") {
+    throw new Error(job.message ?? "Cancelled by user");
+  }
+}
+
 async function updateJobPersistent(jobId: string, updates: Partial<JobStatus>): Promise<void> {
   // Update in-memory
   updateJob(jobId, updates);
@@ -141,6 +149,7 @@ export async function processJob(
       updateJob(jobId, { rocketrideToken: undefined });
     }
 
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       script,
       progress: 15,
@@ -269,6 +278,7 @@ export async function processJob(
     }
 
     // Stage 3: Upload assets (55-70%)
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       stage: "uploading_assets",
       progress: 55,
@@ -383,6 +393,7 @@ export async function processJob(
     }
 
     // Stage 4: Generate music (70-75%)
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       progress: 70,
       message: "Assets uploaded, generating background music...",
@@ -418,6 +429,7 @@ export async function processJob(
     });
 
     // Stage 5: Compose video with Remotion (75-95%)
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       stage: "composing_video",
       progress: 75,
@@ -451,8 +463,7 @@ export async function processJob(
       console.error(
         `Remotion render failed: ${err instanceof Error ? err.message : err}. Using preview fallback.`
       );
-      const downloadKey = generateKey(jobId, "final.mp4");
-      downloadUrl = getPublicUrl(downloadKey);
+      downloadUrl = firstSuccessful?.videoUrl ?? "";
     }
 
     // Stage 6: Completed
@@ -554,6 +565,7 @@ async function processTemplateJob(
       }
     }
 
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       progress: 40,
       message: "Template content generated",
@@ -755,6 +767,7 @@ async function processTemplateJob(
     });
 
     // Stage 4: Render via Remotion (60-90%)
+    checkCancelled(jobId);
     await updateJobPersistent(jobId, {
       stage: "composing_video",
       progress: 65,
@@ -791,8 +804,7 @@ async function processTemplateJob(
       downloadUrl = await uploadFile(outputPath, downloadKey);
     } catch (err) {
       console.error(`Remotion render failed: ${err instanceof Error ? err.message : err}`);
-      const downloadKey = generateKey(jobId, "final.mp4");
-      downloadUrl = getPublicUrl(downloadKey);
+      downloadUrl = "";
     }
 
     // Stage 5: Completed
