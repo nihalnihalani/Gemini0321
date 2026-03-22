@@ -58,16 +58,31 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
 }
 
 /**
+ * Strip markdown code fences from LLM responses.
+ * Gemini often wraps JSON in ```json ... ``` blocks.
+ */
+function stripCodeFences(text: string): string {
+  return text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+}
+
+/**
  * Extract structured data from a pipeline result.
- * Handles multiple response shapes: answers array, data field, or raw result.
+ * The RocketRide pipeline returns answers as an array of strings.
+ * Gemini often wraps JSON in markdown code fences — we strip those before parsing.
  */
 function extractResultData(result: Record<string, unknown>): unknown {
   const answers = result.answers;
   if (Array.isArray(answers) && answers.length > 0) {
-    return typeof answers[0] === "string" ? JSON.parse(answers[0]) : answers[0];
+    if (typeof answers[0] === "string") {
+      return JSON.parse(stripCodeFences(answers[0]));
+    }
+    return answers[0];
   }
   if (result.data) {
-    return typeof result.data === "string" ? JSON.parse(result.data as string) : result.data;
+    if (typeof result.data === "string") {
+      return JSON.parse(stripCodeFences(result.data as string));
+    }
+    return result.data;
   }
   return result;
 }
@@ -94,8 +109,8 @@ export async function runScriptPipeline(
   onToken?.(token);
 
   try {
-    const input = JSON.stringify({ prompt, sceneCount });
-    const result = await rc.send(token, input, { name: "request.json" }, "application/json");
+    const input = `Create a video script with exactly ${sceneCount} scenes for the following concept:\n\n${prompt}\n\nReturn a JSON object with: title, theme, target_audience, music_prompt, scenes (array with scene_number, title, visual_description, narration_text, duration_seconds, camera_direction, mood, transition), total_duration_seconds.`;
+    const result = await rc.send(token, input, { name: "prompt.txt" }, "text/plain");
 
     if (!result) {
       throw new Error("RocketRide pipeline returned no result");
@@ -126,8 +141,12 @@ export async function runTemplateContentPipeline(
   onToken?.(token);
 
   try {
-    const input = JSON.stringify({ templateId, sourceContent, sourceType });
-    const result = await rc.send(token, input, { name: "request.json" }, "application/json");
+    const sourceLabel = sourceType === "youtube" ? "YouTube video analysis"
+      : sourceType === "github" ? "GitHub repository information"
+      : "user prompt";
+
+    const input = `Generate video content for a "${templateId}" template from the following ${sourceLabel}:\n\n${sourceContent}\n\nReturn ONLY valid JSON matching the ${templateId} template schema.`;
+    const result = await rc.send(token, input, { name: "prompt.txt" }, "text/plain");
 
     if (!result) {
       throw new Error("RocketRide pipeline returned no result");

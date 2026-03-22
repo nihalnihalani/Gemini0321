@@ -55,12 +55,10 @@
       "id": "gemini_1",
       "provider": "llm_gemini",
       "config": {
-        "profile": "gemini-2.5-flash",
-        "gemini-2.5-flash": {
-          "model": "models/gemini-2.5-flash",
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
-        },
-        "temperature": 0.6
+        }
       },
       "input": [
         {
