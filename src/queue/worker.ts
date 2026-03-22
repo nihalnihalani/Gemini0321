@@ -993,10 +993,109 @@ async function processEditorialJob(
       message: "Compiling editorial beat sheet...",
     });
 
+    // Generate dynamic images tailored to the content
+    await updateJobPersistent(jobId, {
+      progress: 22,
+      message: "Generating visuals tailored to content...",
+    });
+
+    type EditorialAsset = {
+      id: string;
+      role: "hero_object" | "detail_crop" | "context_frame" | "closing_object";
+      src: string;
+      semanticTags: string[];
+      treatment?: { radius?: number; saturation?: number; opacity?: number; blur?: number };
+      drift?: { fromX?: number; toX?: number; fromY?: number; toY?: number; scaleFrom?: number; scaleTo?: number };
+    };
+
+    const dynamicAssets: EditorialAsset[] = [];
+    const { resolveEditorialSource } = await import("@/editorial/source");
+    const editorialSource = resolveEditorialSource(enrichedPrompt);
+    const title = editorialSource.title;
+    const abstract = editorialSource.abstract;
+    const keywords = editorialSource.keywords.slice(0, 5).join(", ");
+    const sections = editorialSource.sections.slice(0, 3).map(s => s.title).join(", ");
+
+    const assetPrompts: { id: string; role: EditorialAsset["role"]; prompt: string; tags: string[] }[] = [
+      {
+        id: `editorial-hero-${jobId.slice(0, 8)}`,
+        role: "hero_object",
+        prompt: `Minimalist, editorial-quality hero image representing "${title}". ${abstract}. Clean composition, soft lighting, premium magazine aesthetic. No text or words in the image.`,
+        tags: ["intro", "hero", "overview", ...editorialSource.keywords.slice(0, 3)],
+      },
+      {
+        id: `editorial-detail-${jobId.slice(0, 8)}`,
+        role: "detail_crop",
+        prompt: `Close-up detail shot related to ${keywords || title}. Shallow depth of field, warm tones, editorial magazine quality. Abstract and artistic. No text or words.`,
+        tags: ["detail", "close-up", ...editorialSource.keywords.slice(1, 4)],
+      },
+      {
+        id: `editorial-context-${jobId.slice(0, 8)}`,
+        role: "context_frame",
+        prompt: `Wide contextual scene representing the world of ${title}. ${sections ? `Themes: ${sections}.` : ""} Environmental, architectural feel, cool tones, editorial quality. No text.`,
+        tags: ["context", "environment", ...editorialSource.keywords.slice(2, 5)],
+      },
+      {
+        id: `editorial-closing-${jobId.slice(0, 8)}`,
+        role: "closing_object",
+        prompt: `Quiet, contemplative closing image for "${title}". Soft, faded, minimal. Evokes completion and reflection. Editorial quality, muted tones. No text.`,
+        tags: ["closing", "quiet", "fade", ...editorialSource.keywords.slice(0, 2)],
+      },
+    ];
+
+    try {
+      const { mkdir: mkdirAsync, writeFile: writeFileAsync } = await import("fs/promises");
+      const imgDir = `/tmp/editorial-assets/${jobId}`;
+      await mkdirAsync(imgDir, { recursive: true });
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+      const imageResults = await Promise.allSettled(
+        assetPrompts.map(async (ap) => {
+          const response = await ai.models.generateContent({
+            model: "gemini-3-pro-image-preview",
+            contents: ap.prompt,
+            config: { responseModalities: ["IMAGE"] },
+          });
+          const part = response.candidates?.[0]?.content?.parts?.[0];
+          if (!part?.inlineData?.data) throw new Error("No image data");
+          const filePath = `${imgDir}/${ap.id}.png`;
+          await writeFileAsync(filePath, Buffer.from(part.inlineData.data, "base64"));
+          return { ...ap, filePath };
+        })
+      );
+
+      for (const ir of imageResults) {
+        if (ir.status === "fulfilled") {
+          dynamicAssets.push({
+            id: ir.value.id,
+            role: ir.value.role,
+            src: ir.value.filePath,
+            semanticTags: ir.value.tags,
+            treatment: { radius: 24, saturation: 0.85, opacity: 1 },
+            drift: { fromX: 0, toX: 0, fromY: -4, toY: 4, scaleFrom: 1, scaleTo: 1.01 },
+          });
+          console.log(`[Editorial] Generated ${ir.value.role} image: ${ir.value.id}`);
+        } else {
+          console.warn(`[Editorial] Image generation failed for one asset: ${ir.reason}`);
+        }
+      }
+      console.log(`[Editorial] Generated ${dynamicAssets.length}/4 dynamic assets`);
+    } catch (imgError) {
+      console.warn(`[Editorial] Dynamic image generation failed, using reference assets: ${imgError instanceof Error ? imgError.message : imgError}`);
+    }
+
+    await updateJobPersistent(jobId, {
+      progress: 35,
+      message: `Generated ${dynamicAssets.length} custom visuals, compiling beat sheet...`,
+    });
+
     const result = await buildEditorialEngineResult(enrichedPrompt, {
       brainMode: llmPlanResult ? "llm" : "rule-based",
       llmPlanResult,
       preset: "editorial-generator",
+      ...(dynamicAssets.length > 0 ? { assets: dynamicAssets } : {}),
     });
 
     checkCancelled(jobId);

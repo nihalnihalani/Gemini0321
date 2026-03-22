@@ -550,7 +550,7 @@ const AssetCard: React.FC<{
       }}
     >
       <Img
-        src={staticFile(asset.src)}
+        src={asset.src.startsWith("http") || asset.src.startsWith("/tmp") ? asset.src : staticFile(asset.src)}
         style={{
           width: "100%",
           height: "100%",
