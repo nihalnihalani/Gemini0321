@@ -137,8 +137,8 @@ const RemotionRoot: React.FC = () => {
           conclusion: "Now you understand!",
         }}
         calculateMetadata={({ props }) => {
-          // Intro(4s) + Steps(8s each) + Summary(6s)
-          const totalSeconds = 4 + props.steps.length * 8 + 6;
+          // Intro(7s) + Steps(12s each) + Summary(9s)
+          const totalSeconds = 7 + props.steps.length * 12 + 9;
           return { durationInFrames: totalSeconds * FPS };
         }}
       />

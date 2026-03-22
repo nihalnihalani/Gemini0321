@@ -1,18 +1,27 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   useCurrentFrame,
   useVideoConfig,
   spring,
   interpolate,
 } from "remotion";
+import { NarrationCaptions } from "../components/NarrationCaptions";
 
 interface TitleIntroProps {
   title: string;
   stepCount: number;
+  narrationUrl?: string;
+  introNarration?: string;
 }
 
-export const TitleIntro: React.FC<TitleIntroProps> = ({ title, stepCount }) => {
+export const TitleIntro: React.FC<TitleIntroProps> = ({
+  title,
+  stepCount,
+  narrationUrl,
+  introNarration,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -95,9 +104,18 @@ export const TitleIntro: React.FC<TitleIntroProps> = ({ title, stepCount }) => {
             textAlign: "center",
           }}
         >
-          {stepCount} steps to understand
+          {introNarration || `${stepCount} steps to understand`}
         </div>
       </div>
+
+      {narrationUrl && <Audio src={narrationUrl} volume={1} />}
+      {introNarration && (
+        <NarrationCaptions
+          text={introNarration}
+          position="bottom"
+          activeColor="#a855f7"
+        />
+      )}
     </AbsoluteFill>
   );
 };

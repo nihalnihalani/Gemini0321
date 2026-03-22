@@ -1,12 +1,14 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   useCurrentFrame,
   useVideoConfig,
   spring,
   interpolate,
 } from "remotion";
+import { NarrationCaptions } from "../components/NarrationCaptions";
 
 interface StepSceneProps {
   stepNumber: number;
@@ -14,6 +16,8 @@ interface StepSceneProps {
   description: string;
   iconUrl?: string;
   totalSteps: number;
+  narrationUrl?: string;
+  sfxUrl?: string;
 }
 
 export const StepScene: React.FC<StepSceneProps> = ({
@@ -22,6 +26,8 @@ export const StepScene: React.FC<StepSceneProps> = ({
   description,
   iconUrl,
   totalSteps,
+  narrationUrl,
+  sfxUrl,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -204,6 +210,14 @@ export const StepScene: React.FC<StepSceneProps> = ({
           </div>
         </div>
       </div>
+
+      {narrationUrl && <Audio src={narrationUrl} volume={1} />}
+      {sfxUrl && <Audio src={sfxUrl} volume={0.3} />}
+      <NarrationCaptions
+        text={description}
+        position="bottom"
+        activeColor="#a855f7"
+      />
     </AbsoluteFill>
   );
 };

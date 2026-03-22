@@ -1,20 +1,26 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   useCurrentFrame,
   useVideoConfig,
   spring,
   interpolate,
 } from "remotion";
+import { NarrationCaptions } from "../components/NarrationCaptions";
 
 interface SummarySceneProps {
   conclusion: string;
   stepTitles: string[];
+  narrationUrl?: string;
+  summaryNarration?: string;
 }
 
 export const SummaryScene: React.FC<SummarySceneProps> = ({
   conclusion,
   stepTitles,
+  narrationUrl,
+  summaryNarration,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -176,6 +182,15 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
           {conclusion}
         </div>
       </div>
+
+      {narrationUrl && <Audio src={narrationUrl} volume={1} />}
+      {summaryNarration && (
+        <NarrationCaptions
+          text={summaryNarration}
+          position="bottom"
+          activeColor="#22c55e"
+        />
+      )}
     </AbsoluteFill>
   );
 };
