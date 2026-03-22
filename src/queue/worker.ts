@@ -547,17 +547,46 @@ async function processTemplateJob(
     } else if (templateId === "explainer") {
       const ex = enrichedContent as Record<string, unknown>;
       const steps = (ex.steps as { title: string; description: string }[]) || [];
+      const introNarration = (ex.introNarration as string) || `Let's explore ${ex.title}. Here's what you need to know.`;
+      const summaryNarration = (ex.summaryNarration as string) || String(ex.conclusion || "And that's a wrap.");
+
+      // Scene 0: Intro narration — hook the viewer
+      templateScenes.push({
+        scene_number: 0,
+        title: "Introduction",
+        visual_description: String(ex.title || ""),
+        narration_text: introNarration,
+        duration_seconds: 7,
+        camera_direction: "static",
+        mood: "welcoming",
+        transition: "fade" as const,
+      });
+
+      // Scene 1..N: Step narrations — teach each concept
       steps.forEach((step, i) => {
+        const stepNarration = `Step ${i + 1}: ${step.title}. ${step.description}`;
         templateScenes.push({
           scene_number: i + 1,
           title: step.title,
           visual_description: step.description,
-          narration_text: `${step.title}. ${step.description}`,
-          duration_seconds: 6,
+          narration_text: stepNarration,
+          duration_seconds: 10,
           camera_direction: "static",
           mood: "educational",
           transition: "fade" as const,
         });
+      });
+
+      // Final scene: Summary narration — wrap up with conclusion
+      templateScenes.push({
+        scene_number: steps.length + 1,
+        title: "Summary",
+        visual_description: String(ex.conclusion || ""),
+        narration_text: summaryNarration,
+        duration_seconds: 8,
+        camera_direction: "static",
+        mood: "concluding",
+        transition: "fade" as const,
       });
     } else if (templateId === "social-promo") {
       const sp = enrichedContent as Record<string, unknown>;

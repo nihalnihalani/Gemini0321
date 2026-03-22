@@ -46,7 +46,7 @@ export async function generateNarration(
 
   const voiceId = config?.voiceId ?? DEFAULT_VOICE_ID;
   const modelId = config?.modelId ?? DEFAULT_MODEL_ID;
-  const stability = config?.stability ?? 0.5;
+  const stability = config?.stability ?? 0.6;
   const similarityBoost = config?.similarityBoost ?? 0.75;
 
   const audio = await elevenlabs.textToSpeech.convert(voiceId, {
