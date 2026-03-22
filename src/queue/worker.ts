@@ -3,7 +3,6 @@ import { runScriptPipeline, runTemplateContentPipeline } from "@/lib/rocketride"
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
-import { generateMusic } from "@/lib/lyria";
 import { renderVideo, renderTemplateVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
 import { extractGitHubContent } from "@/lib/github";
@@ -118,21 +117,29 @@ export async function processJob(
       message: "Generating script with Gemini...",
     });
 
-    // Try RocketRide pipeline first, fall back to direct Gemini
+    // Try RocketRide pipeline first, fall back to direct Gemini on connection errors only
     let script;
     try {
-      script = await runScriptPipeline(prompt, sceneCount, (token) => {
-        updateJob(jobId, { rocketrideToken: token });
-      });
-      console.log(`[RocketRide] Script generated via pipeline for job ${jobId}`);
-    } catch (rrError) {
-      console.warn(
-        `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
-      );
-      script = await generateScript(prompt, sceneCount);
+      try {
+        script = await runScriptPipeline(prompt, sceneCount, (token) => {
+          // Synchronous — must stay sync to avoid race with cancel endpoint
+          updateJob(jobId, { rocketrideToken: token });
+        });
+        console.log(`[RocketRide] Script generated via pipeline for job ${jobId}`);
+      } catch (rrError) {
+        // Only fall back for connection/network errors — not for schema or parse errors
+        const isDataError = rrError instanceof SyntaxError
+          || (rrError && typeof rrError === "object" && "issues" in rrError); // ZodError
+        if (isDataError) throw rrError;
+
+        console.warn(
+          `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
+        );
+        script = await generateScript(prompt, sceneCount);
+      }
+    } finally {
+      updateJob(jobId, { rocketrideToken: undefined });
     }
-    // Clear token after pipeline completes
-    updateJob(jobId, { rocketrideToken: undefined });
 
     await updateJobPersistent(jobId, {
       script,
@@ -375,15 +382,10 @@ export async function processJob(
       }
     }
 
-    await updateJobPersistent(jobId, {
-      progress: 70,
-      message: "Assets uploaded",
-    });
-
     // Stage 4: Generate music (70-75%)
     await updateJobPersistent(jobId, {
       progress: 70,
-      message: "Generating background music...",
+      message: "Assets uploaded, generating background music...",
     });
 
     const generatedScript: GeneratedScript = {
@@ -517,21 +519,27 @@ async function processTemplateJob(
       message: "Generating template content with Gemini...",
     });
 
-    // Try RocketRide pipeline first, fall back to direct Gemini
+    // Try RocketRide pipeline first, fall back to direct Gemini on connection errors only
     let templateContent: TemplateInput;
     try {
-      templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token) => {
-        updateJob(jobId, { rocketrideToken: token });
-      });
-      console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);
-    } catch (rrError) {
-      console.warn(
-        `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
-      );
-      templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
+      try {
+        templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token) => {
+          updateJob(jobId, { rocketrideToken: token });
+        });
+        console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);
+      } catch (rrError) {
+        const isDataError = rrError instanceof SyntaxError
+          || (rrError && typeof rrError === "object" && "issues" in rrError);
+        if (isDataError) throw rrError;
+
+        console.warn(
+          `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
+        );
+        templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
+      }
+    } finally {
+      updateJob(jobId, { rocketrideToken: undefined });
     }
-    // Clear token after pipeline completes
-    updateJob(jobId, { rocketrideToken: undefined });
 
     // Merge user-provided assets into template content
     const enrichedContent = { ...templateContent } as Record<string, unknown>;

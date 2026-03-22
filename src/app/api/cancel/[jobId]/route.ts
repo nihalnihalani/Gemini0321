@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { jobs } from "@/queue/worker";
 import { terminateTask } from "@/lib/rocketride";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params;
+
+  // Validate jobId format
+  if (!UUID_RE.test(jobId)) {
+    return NextResponse.json({ error: "Invalid job ID format" }, { status: 400 });
+  }
 
   const job = jobs.get(jobId);
   if (!job) {
@@ -20,10 +27,22 @@ export async function POST(
     );
   }
 
-  // Terminate RocketRide pipeline if a token exists
-  if (job.rocketrideToken) {
+  // Capture and clear token synchronously BEFORE any await to prevent TOCTOU race
+  const token = job.rocketrideToken;
+  job.rocketrideToken = undefined;
+
+  // Mark as failed synchronously so concurrent requests see the updated state
+  Object.assign(job, {
+    stage: "failed",
+    message: "Cancelled by user",
+    error: "Cancelled by user",
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Terminate RocketRide pipeline if a token was captured
+  if (token) {
     try {
-      await terminateTask(job.rocketrideToken);
+      await terminateTask(token);
       console.log(`[RocketRide] Terminated pipeline for job ${jobId}`);
     } catch (err) {
       console.warn(
@@ -31,14 +50,6 @@ export async function POST(
       );
     }
   }
-
-  // Update job status to failed/cancelled
-  Object.assign(job, {
-    stage: "failed",
-    message: "Cancelled by user",
-    error: "Cancelled by user",
-    updatedAt: new Date().toISOString(),
-  });
 
   return NextResponse.json({ jobId, status: "cancelled" });
 }
