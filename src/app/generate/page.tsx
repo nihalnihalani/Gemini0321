@@ -207,27 +207,30 @@ function GenerateContent() {
       )}
 
       {!status && !error && (
-        <div className="flex items-center gap-2" style={{ color: "var(--primary)" }}>
-          <svg
-            className="h-5 w-5 animate-spin"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          Loading status...
+        <div className="w-full max-w-2xl space-y-6 animate-fade-in">
+          {/* Skeleton stepper */}
+          <div className="flex items-center justify-between gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex flex-1 items-center">
+                <div className="skeleton h-9 w-9 rounded-full flex-shrink-0" />
+                {i < 5 && <div className="skeleton mx-1 h-[2px] flex-1" />}
+              </div>
+            ))}
+          </div>
+          {/* Skeleton progress bar */}
+          <div className="space-y-2">
+            <div className="skeleton h-1.5 w-full rounded-full" />
+            <div className="flex justify-between">
+              <div className="skeleton skeleton-text w-32" />
+              <div className="skeleton skeleton-text w-8" />
+            </div>
+          </div>
+          {/* Skeleton scene cards */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="skeleton skeleton-rect h-20 w-full" />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -238,11 +241,17 @@ export default function GeneratePage() {
   return (
     <Suspense
       fallback={
-        <div
-          className="flex min-h-screen items-center justify-center"
-          style={{ color: "var(--outline)" }}
-        >
-          Loading...
+        <div className="flex min-h-screen flex-col items-center justify-center px-4">
+          <div className="w-full max-w-2xl space-y-6">
+            <div className="skeleton skeleton-heading mx-auto" />
+            <div className="skeleton skeleton-text mx-auto w-24" />
+            <div className="skeleton h-1.5 w-full rounded-full" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton skeleton-rect h-20 w-full" />
+              ))}
+            </div>
+          </div>
         </div>
       }
     >

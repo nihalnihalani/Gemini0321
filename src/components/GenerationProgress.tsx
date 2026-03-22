@@ -104,7 +104,7 @@ function SceneCard({
 
   return (
     <div
-      className="rounded-xl bg-[#1b1b20] p-5 animate-fade-in-up"
+      className="rounded-xl bg-[#1b1b20] p-5 animate-fade-in-up transition-colors duration-200 hover:bg-[#22222a]"
       style={{ animationDelay: `${index * 80}ms`, animationFillMode: "both" }}
     >
       <div className="flex items-start justify-between">
