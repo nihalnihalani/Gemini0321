@@ -1,11 +1,10 @@
-import { generateScript, generateTemplateContent } from "@/lib/gemini";
+import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
 import { generateMusic } from "@/lib/lyria";
 import { renderVideo, renderTemplateVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
-import { extractYouTubeContent } from "@/lib/youtube";
 import { extractGitHubContent } from "@/lib/github";
 import { getTemplate } from "@/lib/templates";
 import { mkdir } from "fs/promises";
@@ -475,8 +474,9 @@ async function processTemplateJob(
     let sourceContent = prompt;
 
     if (sourceType === "youtube" && sourceUrl) {
-      const ytMeta = await extractYouTubeContent(sourceUrl);
-      sourceContent = `Title: ${ytMeta.title}\nChannel: ${ytMeta.channelName}\nDescription: ${ytMeta.description}\n\nUser prompt: ${prompt}`;
+      console.log(`Analyzing YouTube video with Gemini: ${sourceUrl}`);
+      const ytAnalysis = await analyzeYouTubeVideo(sourceUrl);
+      sourceContent = `YouTube Video Analysis:\n${ytAnalysis}\n\nUser prompt: ${prompt}`;
     } else if (sourceType === "github" && sourceUrl) {
       const ghMeta = await extractGitHubContent(sourceUrl);
       sourceContent = `Repository: ${ghMeta.name}\nDescription: ${ghMeta.description}\nLanguage: ${ghMeta.language}\nStars: ${ghMeta.stars}\nTopics: ${ghMeta.topics.join(", ")}\nFeatures: ${ghMeta.features.join(", ")}\nREADME:\n${ghMeta.readmeContent.slice(0, 2000)}\n\nUser prompt: ${prompt}`;
