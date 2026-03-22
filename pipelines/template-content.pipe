@@ -1,0 +1,86 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "mode": "Source",
+        "parameters": {
+          "endpoint": "/template-content",
+          "host": "0.0.0.0",
+          "port": 5568
+        },
+        "type": "webhook"
+      },
+      "input": []
+    },
+    {
+      "id": "question_1",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Role",
+            "instruction": "You are a world-class creative director who generates structured content for video templates. The input will contain a JSON object with 'templateId' (product-launch, explainer, social-promo, or brand-story), 'sourceContent' (the source material), and 'sourceType' (prompt, youtube, or github)."
+          },
+          {
+            "title": "Product Launch Template",
+            "instruction": "For templateId 'product-launch', return JSON with: brandName (string), tagline (provocative hook, max 12 words), productImages (empty array), features (3-5 short rhythmic phrases of 2-5 words each), brandColor (hex color), logoUrl (empty string). Features must be short enough to animate word-by-word. Tagline must be conversational, not corporate."
+          },
+          {
+            "title": "Explainer Template",
+            "instruction": "For templateId 'explainer', return JSON with: title (authoritative, clear), steps (3-5 objects with title (3-6 words), description (1-2 sentences, max 30 words), iconUrl (empty)), conclusion (1-2 sentences), introNarration (2-3 sentences, conversational hook), summaryNarration (2-3 sentences, memorable wrap-up). Steps must follow logical cause-and-effect."
+          },
+          {
+            "title": "Social Promo Template",
+            "instruction": "For templateId 'social-promo', return JSON with: hook (3-6 attention-grabbing words), productImage (empty string), features (3-4 ultra-short phrases of 2-4 words), cta (2-4 word call-to-action), aspectRatio ('9:16' default). Everything should be bold, punchy, scroll-stopping."
+          },
+          {
+            "title": "Brand Story Template",
+            "instruction": "For templateId 'brand-story', return JSON with: companyName (exact name), mission (1-2 sentence manifesto), teamPhotos (empty array), milestones (3-5 objects with year (string) and event (narrative sentence)), vision (1-2 aspirational sentences), logoUrl (empty string). Every piece of text should evoke emotion."
+          }
+        ]
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ]
+    },
+    {
+      "id": "gemini_1",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2.5-flash",
+        "gemini-2.5-flash": {
+          "model": "models/gemini-2.5-flash",
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        },
+        "temperature": 0.6
+      },
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_1"
+        }
+      ]
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {
+        "lanes": ["answers"]
+      },
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_1"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "mode": "Source",
+        "parameters": {
+          "endpoint": "/video-script",
+          "host": "0.0.0.0",
+          "port": 5567
+        },
+        "type": "webhook"
+      },
+      "input": []
+    },
+    {
+      "id": "question_1",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Role",
+            "instruction": "You are a professional cinematic video script writer. Your job is to generate structured video scripts for AI-powered video generation."
+          },
+          {
+            "title": "Scene Requirements",
+            "instruction": "Each scene must have: scene_number (sequential from 1), title, visual_description (vivid, detailed for AI video generation — include setting, subjects, actions, lighting, colors, atmosphere), narration_text (concise voiceover), camera_direction (wide shot, close-up, tracking shot, slow pan, aerial, etc.), mood (emotional tone), duration_seconds (4-8), transition (cut, fade, dissolve, or wipe)."
+          },
+          {
+            "title": "Guidelines",
+            "instruction": "Create a cohesive narrative arc across all scenes. Vary camera angles for visual interest. Make visual descriptions specific and concrete. Keep narration concise and impactful. Ensure total_duration_seconds equals the sum of all scene durations. Choose a fitting title, theme, target_audience, and music_prompt."
+          },
+          {
+            "title": "Output Format",
+            "instruction": "Return a JSON object with: title (string), theme (string), target_audience (string), music_prompt (string), scenes (array of scene objects), total_duration_seconds (number). The input will contain a 'prompt' field with the video concept and a 'sceneCount' field specifying the number of scenes."
+          }
+        ]
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ]
+    },
+    {
+      "id": "gemini_1",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2.5-flash",
+        "gemini-2.5-flash": {
+          "model": "models/gemini-2.5-flash",
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        },
+        "temperature": 0.8
+      },
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_1"
+        }
+      ]
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {
+        "lanes": ["answers"]
+      },
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_1"
+        }
+      ]
+    }
+  ]
+}

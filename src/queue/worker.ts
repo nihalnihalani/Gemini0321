@@ -1,4 +1,5 @@
 import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/lib/gemini";
+import { runScriptPipeline, runTemplateContentPipeline } from "@/lib/rocketride";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
@@ -117,7 +118,17 @@ export async function processJob(
       message: "Generating script with Gemini...",
     });
 
-    const script = await generateScript(prompt, sceneCount);
+    // Try RocketRide pipeline first, fall back to direct Gemini
+    let script;
+    try {
+      script = await runScriptPipeline(prompt, sceneCount);
+      console.log(`[RocketRide] Script generated via pipeline for job ${jobId}`);
+    } catch (rrError) {
+      console.warn(
+        `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
+      );
+      script = await generateScript(prompt, sceneCount);
+    }
 
     await updateJobPersistent(jobId, {
       script,
@@ -502,7 +513,17 @@ async function processTemplateJob(
       message: "Generating template content with Gemini...",
     });
 
-    const templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
+    // Try RocketRide pipeline first, fall back to direct Gemini
+    let templateContent: TemplateInput;
+    try {
+      templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType);
+      console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);
+    } catch (rrError) {
+      console.warn(
+        `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
+      );
+      templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
+    }
 
     // Merge user-provided assets into template content
     const enrichedContent = { ...templateContent } as Record<string, unknown>;
