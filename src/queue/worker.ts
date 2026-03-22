@@ -207,40 +207,32 @@ export async function processJob(
       message: `Generated ${successfulClips.length}/${script.scenes.length} clips`,
     });
 
-    // Generate narration audio for all scenes (non-critical)
+    // Generate narration and sound effects in parallel (non-critical)
     let narrationMap = new Map<number, string>();
-    try {
-      await updateJobPersistent(jobId, {
-        progress: 53,
-        message: "Generating narration audio...",
-      });
+    let sfxMap = new Map<number, string>();
 
-      narrationMap = await generateAllNarrations(script.scenes);
-      console.log(
-        `Narration generation complete: ${narrationMap.size}/${script.scenes.length} scenes`
-      );
-    } catch (err) {
-      console.error(
-        `Narration generation failed: ${err instanceof Error ? err.message : err}`
-      );
+    await updateJobPersistent(jobId, {
+      progress: 53,
+      message: "Generating narration and sound effects...",
+    });
+
+    const [legacyNarrationResult, legacySfxResult] = await Promise.allSettled([
+      generateAllNarrations(script.scenes),
+      generateAllSFX(script.scenes),
+    ]);
+
+    if (legacyNarrationResult.status === "fulfilled") {
+      narrationMap = legacyNarrationResult.value;
+      console.log(`Narration generation complete: ${narrationMap.size}/${script.scenes.length} scenes`);
+    } else {
+      console.error(`Narration generation failed: ${legacyNarrationResult.reason instanceof Error ? legacyNarrationResult.reason.message : legacyNarrationResult.reason}`);
     }
 
-    // Generate sound effects for all scenes (non-critical)
-    let sfxMap = new Map<number, string>();
-    try {
-      await updateJobPersistent(jobId, {
-        progress: 54,
-        message: "Generating sound effects...",
-      });
-
-      sfxMap = await generateAllSFX(script.scenes);
-      console.log(
-        `SFX generation complete: ${sfxMap.size}/${script.scenes.length} scenes`
-      );
-    } catch (err) {
-      console.error(
-        `SFX generation failed: ${err instanceof Error ? err.message : err}`
-      );
+    if (legacySfxResult.status === "fulfilled") {
+      sfxMap = legacySfxResult.value;
+      console.log(`SFX generation complete: ${sfxMap.size}/${script.scenes.length} scenes`);
+    } else {
+      console.error(`SFX generation failed: ${legacySfxResult.reason instanceof Error ? legacySfxResult.reason.message : legacySfxResult.reason}`);
     }
 
     // Stage 3: Upload assets (55-70%)
@@ -379,15 +371,20 @@ export async function processJob(
     };
 
     try {
-      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
-      const musicKey = generateKey(jobId, "music.mp3");
+      const musicPath = await generateMusic(script.music_prompt, {
+        durationSeconds: script.total_duration_seconds,
+        mood: script.scenes[0]?.mood,
+      });
+      const musicKey = generateKey(jobId, "music.wav");
       const musicUrl = await uploadFile(musicPath, musicKey);
       generatedScript.musicUrl = musicUrl;
-      console.log(`Music uploaded: ${musicUrl}`);
+      console.log(`Music generated and uploaded: ${musicUrl}`);
     } catch (err) {
-      console.error(
-        `Music upload failed: ${err instanceof Error ? err.message : err}`
-      );
+      const musicError = err instanceof Error ? err.message : String(err);
+      console.error(`Music generation failed: ${musicError}`);
+      await updateJobPersistent(jobId, {
+        message: `Music generation failed (video will have no background music): ${musicError}`,
+      });
     }
 
     await updateJobPersistent(jobId, {
@@ -516,10 +513,10 @@ async function processTemplateJob(
       message: "Template content generated",
     });
 
-    // Stage 3: Generate background music (40-60%)
+    // Stage 3: Generate music, narration, and SFX in parallel (40-60%)
     await updateJobPersistent(jobId, {
       progress: 45,
-      message: "Generating background music...",
+      message: "Generating audio (music, narration, sound effects)...",
     });
 
     const template = getTemplate(templateId);
@@ -530,19 +527,157 @@ async function processTemplateJob(
       "brand-story": "inspiring, cinematic, emotional orchestral",
     };
 
+    // Build scenes for narration + SFX from template content
+    const templateScenes: Scene[] = [];
+    if (templateId === "product-launch") {
+      const pl = enrichedContent as Record<string, unknown>;
+      const features = (pl.features as string[]) || [];
+      features.forEach((f, i) => {
+        templateScenes.push({
+          scene_number: i + 1,
+          title: String(pl.brandName || ""),
+          visual_description: f,
+          narration_text: f,
+          duration_seconds: 5,
+          camera_direction: "static",
+          mood: "energetic",
+          transition: "cut" as const,
+        });
+      });
+    } else if (templateId === "explainer") {
+      const ex = enrichedContent as Record<string, unknown>;
+      const steps = (ex.steps as { title: string; description: string }[]) || [];
+      steps.forEach((step, i) => {
+        templateScenes.push({
+          scene_number: i + 1,
+          title: step.title,
+          visual_description: step.description,
+          narration_text: `${step.title}. ${step.description}`,
+          duration_seconds: 6,
+          camera_direction: "static",
+          mood: "educational",
+          transition: "fade" as const,
+        });
+      });
+    } else if (templateId === "social-promo") {
+      const sp = enrichedContent as Record<string, unknown>;
+      const features = (sp.features as string[]) || [];
+      templateScenes.push({
+        scene_number: 1,
+        title: "Hook",
+        visual_description: String(sp.hook || ""),
+        narration_text: String(sp.hook || ""),
+        duration_seconds: 3,
+        camera_direction: "static",
+        mood: "bold",
+        transition: "cut" as const,
+      });
+      features.forEach((f, i) => {
+        templateScenes.push({
+          scene_number: i + 2,
+          title: f,
+          visual_description: f,
+          narration_text: f,
+          duration_seconds: 3,
+          camera_direction: "static",
+          mood: "upbeat",
+          transition: "cut" as const,
+        });
+      });
+    } else if (templateId === "brand-story") {
+      const bs = enrichedContent as Record<string, unknown>;
+      templateScenes.push({
+        scene_number: 1,
+        title: String(bs.companyName || ""),
+        visual_description: String(bs.mission || ""),
+        narration_text: String(bs.mission || ""),
+        duration_seconds: 6,
+        camera_direction: "slow pan",
+        mood: "inspiring",
+        transition: "fade" as const,
+      });
+      const milestones = (bs.milestones as { year: string; event: string }[]) || [];
+      milestones.forEach((m, i) => {
+        templateScenes.push({
+          scene_number: i + 2,
+          title: m.year,
+          visual_description: m.event,
+          narration_text: `In ${m.year}, ${m.event}`,
+          duration_seconds: 5,
+          camera_direction: "static",
+          mood: "cinematic",
+          transition: "dissolve" as const,
+        });
+      });
+    }
+
+    // Run music, narration, and SFX generation in parallel
     let musicUrl: string | undefined;
-    try {
-      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
-      const musicKey = generateKey(jobId, "music.mp3");
-      musicUrl = await uploadFile(musicPath, musicKey);
-      console.log(`Music uploaded: ${musicUrl}`);
-    } catch (err) {
-      console.error(`Music upload failed: ${err instanceof Error ? err.message : err}`);
+    let narrationUrls = new Map<number, string>();
+    let sfxUrls = new Map<number, string>();
+
+    const [musicResult, narrationResult, sfxResult] = await Promise.allSettled([
+      // Music generation
+      generateMusic(moodMap[templateId], {
+        durationSeconds: template.defaultDurationSeconds,
+        mood: moodMap[templateId],
+      }),
+      // Narration generation
+      templateScenes.length > 0 ? generateAllNarrations(templateScenes) : Promise.resolve(new Map<number, string>()),
+      // SFX generation
+      templateScenes.length > 0 ? generateAllSFX(templateScenes) : Promise.resolve(new Map<number, string>()),
+    ]);
+
+    // Process music result
+    if (musicResult.status === "fulfilled") {
+      try {
+        const musicKey = generateKey(jobId, "music.wav");
+        musicUrl = await uploadFile(musicResult.value, musicKey);
+        console.log(`Music generated and uploaded: ${musicUrl}`);
+      } catch (err) {
+        console.error(`Music upload failed: ${err instanceof Error ? err.message : err}`);
+      }
+    } else {
+      console.error(`Music generation failed: ${musicResult.reason instanceof Error ? musicResult.reason.message : musicResult.reason}`);
+    }
+
+    // Process narration result
+    if (narrationResult.status === "fulfilled") {
+      const narrationMap = narrationResult.value;
+      for (const [sceneNum, narrationPath] of narrationMap) {
+        try {
+          const narrationKey = generateKey(jobId, `narration-${sceneNum}.mp3`);
+          const url = await uploadFile(narrationPath, narrationKey);
+          narrationUrls.set(sceneNum, url);
+          console.log(`Narration for scene ${sceneNum} uploaded: ${url}`);
+        } catch (err) {
+          console.error(`Narration upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    } else {
+      console.error(`Narration generation failed: ${narrationResult.reason instanceof Error ? narrationResult.reason.message : narrationResult.reason}`);
+    }
+
+    // Process SFX result
+    if (sfxResult.status === "fulfilled") {
+      const sfxMap = sfxResult.value;
+      for (const [sceneNum, sfxPath] of sfxMap) {
+        try {
+          const sfxKey = generateKey(jobId, `sfx-${sceneNum}.mp3`);
+          const url = await uploadFile(sfxPath, sfxKey);
+          sfxUrls.set(sceneNum, url);
+          console.log(`SFX for scene ${sceneNum} uploaded: ${url}`);
+        } catch (err) {
+          console.error(`SFX upload for scene ${sceneNum} failed: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    } else {
+      console.error(`SFX generation failed: ${sfxResult.reason instanceof Error ? sfxResult.reason.message : sfxResult.reason}`);
     }
 
     await updateJobPersistent(jobId, {
       progress: 60,
-      message: "Music generated",
+      message: `Audio generated — music: ${musicUrl ? "yes" : "no"}, narrations: ${narrationUrls.size}, sfx: ${sfxUrls.size}`,
     });
 
     // Stage 4: Render via Remotion (60-90%)
@@ -556,7 +691,12 @@ async function processTemplateJob(
     await mkdir(renderDir, { recursive: true });
     const outputPath = `${renderDir}/${jobId}.mp4`;
 
-    const renderProps = { ...enrichedContent, musicUrl } as TemplateInput & { musicUrl?: string };
+    const renderProps = {
+      ...enrichedContent,
+      musicUrl,
+      narrationUrls: Object.fromEntries(narrationUrls),
+      sfxUrls: Object.fromEntries(sfxUrls),
+    } as TemplateInput & { musicUrl?: string; narrationUrls?: Record<number, string>; sfxUrls?: Record<number, string> };
 
     let downloadUrl: string;
     try {
