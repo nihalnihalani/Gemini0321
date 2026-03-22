@@ -131,6 +131,11 @@ export interface EditHistoryEntry {
 
 export interface GenerateRequest {
   prompt: string;
+  templateId?: TemplateId;
+  sourceType?: SourceType;
+  sourceUrl?: string;
+  assets?: string[];
+  enableVeo?: boolean;
   resolution?: "720p" | "1080p";
   sceneCount?: number;
 }
@@ -139,3 +144,71 @@ export interface GenerateResponse {
   jobId: string;
   message: string;
 }
+
+// Template system types
+export type TemplateId = 'product-launch' | 'explainer' | 'social-promo' | 'brand-story';
+
+export interface ProductLaunchInput {
+  brandName: string;
+  tagline: string;
+  productImages: string[];
+  features: string[];
+  brandColor?: string;
+  logoUrl?: string;
+}
+
+export interface ExplainerInput {
+  title: string;
+  steps: { title: string; description: string; iconUrl?: string }[];
+  conclusion: string;
+}
+
+export interface SocialPromoInput {
+  hook: string;
+  productImage: string;
+  features: string[];
+  cta: string;
+  aspectRatio: '16:9' | '9:16';
+}
+
+export interface BrandStoryInput {
+  companyName: string;
+  mission: string;
+  teamPhotos: string[];
+  milestones: { year: string; event: string }[];
+  vision: string;
+  logoUrl?: string;
+}
+
+export type TemplateInput = ProductLaunchInput | ExplainerInput | SocialPromoInput | BrandStoryInput;
+
+export interface TemplateConfig {
+  id: TemplateId;
+  name: string;
+  description: string;
+  defaultDurationSeconds: number;
+  defaultAspectRatio: '16:9' | '9:16';
+  compositionId: string;
+}
+
+export interface YouTubeMetadata {
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  channelName: string;
+  viewCount?: string;
+  publishedAt?: string;
+}
+
+export interface GitHubMetadata {
+  name: string;
+  description: string;
+  stars: number;
+  language: string;
+  topics: string[];
+  readmeContent: string;
+  ownerAvatarUrl: string;
+  features: string[];
+}
+
+export type SourceType = 'prompt' | 'youtube' | 'github';

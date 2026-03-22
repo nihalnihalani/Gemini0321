@@ -54,8 +54,52 @@ export const ScriptSchema = z.object({
     .describe("Total estimated duration of the video in seconds"),
 });
 
+export const ProductLaunchInputSchema = z.object({
+  brandName: z.string().describe("Brand or product name"),
+  tagline: z.string().describe("Short tagline or slogan"),
+  productImages: z.array(z.string()).describe("URLs of product images"),
+  features: z.array(z.string()).min(2).max(6).describe("Key product features"),
+  brandColor: z.string().optional().describe("Primary brand color as hex"),
+  logoUrl: z.string().optional().describe("Brand logo URL"),
+});
+
+export const ExplainerInputSchema = z.object({
+  title: z.string().describe("Video title"),
+  steps: z.array(z.object({
+    title: z.string().describe("Step title"),
+    description: z.string().describe("Step description"),
+    iconUrl: z.string().optional().describe("Optional icon/diagram URL"),
+  })).min(2).max(6).describe("Explanation steps"),
+  conclusion: z.string().describe("Summary or conclusion text"),
+});
+
+export const SocialPromoInputSchema = z.object({
+  hook: z.string().describe("Attention-grabbing hook text"),
+  productImage: z.string().describe("Main product image URL"),
+  features: z.array(z.string()).min(2).max(4).describe("Quick feature highlights"),
+  cta: z.string().describe("Call to action text"),
+  aspectRatio: z.enum(["16:9", "9:16"]).describe("Video aspect ratio"),
+});
+
+export const BrandStoryInputSchema = z.object({
+  companyName: z.string().describe("Company name"),
+  mission: z.string().describe("Company mission statement"),
+  teamPhotos: z.array(z.string()).describe("Team member photo URLs"),
+  milestones: z.array(z.object({
+    year: z.string().describe("Year of milestone"),
+    event: z.string().describe("What happened"),
+  })).min(2).max(6).describe("Company milestones"),
+  vision: z.string().describe("Vision statement for the future"),
+  logoUrl: z.string().optional().describe("Company logo URL"),
+});
+
 export const GenerateRequestSchema = z.object({
   prompt: z.string().min(10).max(2000),
+  templateId: z.enum(["product-launch", "explainer", "social-promo", "brand-story"]).optional().default("product-launch"),
+  sourceType: z.enum(["prompt", "youtube", "github"]).optional().default("prompt"),
+  sourceUrl: z.string().optional(),
+  assets: z.array(z.string()).optional(),
+  enableVeo: z.boolean().optional().default(false),
   resolution: z.enum(["720p", "1080p"]).optional().default("720p"),
   sceneCount: z.number().min(3).max(8).optional().default(5),
 });
