@@ -5,15 +5,24 @@
       "id": "webhook_1",
       "provider": "webhook",
       "config": {
+        "key": "webhook://*",
         "mode": "Source",
+        "name": "Web Hook",
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
         "parameters": {
           "endpoint": "/video-script",
           "host": "0.0.0.0",
           "port": 5567
         },
+        "sync": false,
         "type": "webhook"
       },
-      "input": []
+      "input": [],
+      "ui": {}
     },
     {
       "id": "question_1",
@@ -45,7 +54,8 @@
           "lane": "text",
           "from": "webhook_1"
         }
-      ]
+      ],
+      "ui": {}
     },
     {
       "id": "gemini_1",
@@ -61,7 +71,8 @@
           "lane": "questions",
           "from": "question_1"
         }
-      ]
+      ],
+      "ui": {}
     },
     {
       "id": "response_1",
@@ -76,7 +87,8 @@
           "lane": "answers",
           "from": "gemini_1"
         }
-      ]
+      ],
+      "ui": {}
     }
   ],
   "project_id": "bc3e1fd0-d68c-4916-98ce-7129c4008b81"

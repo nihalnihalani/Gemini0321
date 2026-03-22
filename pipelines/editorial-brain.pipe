@@ -5,15 +5,24 @@
       "id": "webhook_1",
       "provider": "webhook",
       "config": {
+        "key": "webhook://*",
         "mode": "Source",
+        "name": "Web Hook",
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
         "parameters": {
           "endpoint": "/editorial-brain",
           "host": "0.0.0.0",
           "port": 5569
         },
+        "sync": false,
         "type": "webhook"
       },
-      "input": []
+      "input": [],
+      "ui": {}
     },
     {
       "id": "question_1",
@@ -37,7 +46,8 @@
           "lane": "text",
           "from": "webhook_1"
         }
-      ]
+      ],
+      "ui": {}
     },
     {
       "id": "gemini_1",
@@ -53,7 +63,8 @@
           "lane": "questions",
           "from": "question_1"
         }
-      ]
+      ],
+      "ui": {}
     },
     {
       "id": "response_1",
@@ -68,7 +79,8 @@
           "lane": "answers",
           "from": "gemini_1"
         }
-      ]
+      ],
+      "ui": {}
     }
   ],
   "project_id": "ca7c6cc6-1889-41d9-909d-64354e4c7aa1"
