@@ -104,6 +104,10 @@ export default function PromptInput({ onSubmit, isLoading }: PromptInputProps) {
             value={sceneCount}
             onChange={(e) => setSceneCount(Number(e.target.value))}
             disabled={isLoading}
+            aria-label={`Number of scenes: ${sceneCount}`}
+            aria-valuemin={3}
+            aria-valuemax={8}
+            aria-valuenow={sceneCount}
             className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#1b1b20] accent-[#cdbdff] disabled:opacity-50"
           />
         </div>

@@ -241,6 +241,7 @@ export default function EditPanel({
           <button
             onClick={handleSubmit}
             disabled={!instruction.trim() || isLoading}
+            aria-label={isLoading ? "Sending edit instruction" : "Send edit instruction"}
             className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: "linear-gradient(135deg, var(--primary), var(--primary-container))",

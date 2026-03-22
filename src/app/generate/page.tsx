@@ -9,6 +9,7 @@ import GenerationProgress from "@/components/GenerationProgress";
 import EditPanel from "@/components/EditPanel";
 import LiveChat from "@/components/LiveChat";
 import Navbar from "@/components/Navbar";
+import LoadingSkeleton from "@/components/LoadingSkeleton";
 
 const VideoPreview = dynamic(() => import("@/components/VideoPreview"), {
   ssr: false,
@@ -217,14 +218,8 @@ function GenerateContent() {
               </div>
             ))}
           </div>
-          {/* Skeleton progress bar */}
-          <div className="space-y-2">
-            <div className="skeleton h-1.5 w-full rounded-full" />
-            <div className="flex justify-between">
-              <div className="skeleton skeleton-text w-32" />
-              <div className="skeleton skeleton-text w-8" />
-            </div>
-          </div>
+          {/* Skeleton content bars */}
+          <LoadingSkeleton lines={3} className="mt-4" />
           {/* Skeleton scene cards */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, i) => (

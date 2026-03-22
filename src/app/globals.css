@@ -208,7 +208,7 @@ body::before {
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
-  transition: box-shadow var(--transition-base), transform var(--transition-fast);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
   box-shadow: var(--shadow-ambient);
 }
 .btn-primary:hover {
@@ -235,7 +235,7 @@ body::before {
   border-radius: var(--radius-md);
   border: 1px solid rgba(73, 68, 86, 0.2);
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 .btn-ghost:hover {
   background: rgba(205, 189, 255, 0.05);
@@ -341,6 +341,11 @@ body::before {
   100% { background-position: 200% 0; }
 }
 
+@keyframes page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes scale-spring {
   0% { transform: scale(0); }
   60% { transform: scale(1.15); }
@@ -394,6 +399,10 @@ body::before {
   background: linear-gradient(90deg, transparent 0%, rgba(205, 189, 255, 0.05) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
+}
+
+.page-enter {
+  animation: page-enter 0.3s ease-out;
 }
 
 /* Staggered animation delays */
