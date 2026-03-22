@@ -40,26 +40,39 @@ async function sendMessage(chatId: number, text: string, extra?: Record<string, 
 }
 
 async function sendVideo(chatId: number, videoUrl: string, caption?: string) {
-  try {
-    const res = await fetch(`${API_BASE}/sendVideo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        video: videoUrl,
-        caption,
-        supports_streaming: true,
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
+  const MAX_RETRIES = 4;
+  const RETRY_DELAY_MS = 5_000;
 
-    if (!res.ok) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/sendVideo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          video: videoUrl,
+          caption,
+          supports_streaming: true,
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+
+      if (res.ok) return;
+
       const err = await res.json().catch(() => ({}));
-      console.warn("sendVideo failed:", err);
+      console.warn(`sendVideo attempt ${attempt} failed (HTTP ${res.status}):`, err);
+    } catch (err) {
+      console.warn(`sendVideo attempt ${attempt} failed (network):`, err);
     }
-  } catch (err) {
-    console.warn("sendVideo failed:", err);
+
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
   }
+
+  // All retries exhausted — send the URL as a text message fallback
+  console.warn("sendVideo exhausted retries, falling back to text message");
+  await sendMessage(chatId, `✅ Your video is ready:\n${videoUrl}`);
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
