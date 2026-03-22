@@ -894,26 +894,145 @@ async function processEditorialJob(
     const ghParsed = parseGitHubUrl(prompt);
     if (ghParsed) {
       await updateJobPersistent(jobId, {
-        progress: 5,
-        message: `Fetching GitHub repo: ${ghParsed.owner}/${ghParsed.repo}...`,
+        progress: 3,
+        message: `Cloning ${ghParsed.owner}/${ghParsed.repo}...`,
       });
       try {
+        const { execSync } = await import("child_process");
+        const { readFileSync, readdirSync, statSync, existsSync } = await import("fs");
+        const cloneDir = `/tmp/editorial-repos/${jobId}`;
+        execSync(`rm -rf ${cloneDir} && git clone --depth 1 https://github.com/${ghParsed.owner}/${ghParsed.repo}.git ${cloneDir}`, {
+          timeout: 30_000,
+          stdio: "pipe",
+        });
+        console.log(`[Editorial] Cloned ${ghParsed.owner}/${ghParsed.repo} to ${cloneDir}`);
+
+        await updateJobPersistent(jobId, {
+          progress: 5,
+          message: "Reading and analyzing repository...",
+        });
+
+        // Read key files from the repo
+        const readFile = (p: string) => { try { return readFileSync(p, "utf-8"); } catch { return ""; } };
+        const readme = readFile(`${cloneDir}/README.md`) || readFile(`${cloneDir}/readme.md`);
+        const pkgJson = readFile(`${cloneDir}/package.json`);
+        const claudeMd = readFile(`${cloneDir}/CLAUDE.md`);
+
+        // Collect source file tree (max 3 levels, skip node_modules/dist/build)
+        const skipDirs = new Set(["node_modules", "dist", "build", "out", ".git", ".next", "__pycache__", "vendor", "target"]);
+        const fileTree: string[] = [];
+        const keyFiles: { path: string; content: string }[] = [];
+        const codeExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".swift", ".kt"]);
+
+        const walk = (dir: string, depth: number) => {
+          if (depth > 3) return;
+          try {
+            const entries = readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.name.startsWith(".") || skipDirs.has(entry.name)) continue;
+              const fullPath = `${dir}/${entry.name}`;
+              const relPath = fullPath.replace(`${cloneDir}/`, "");
+              if (entry.isDirectory()) {
+                fileTree.push(`${relPath}/`);
+                walk(fullPath, depth + 1);
+              } else {
+                fileTree.push(relPath);
+                const ext = entry.name.substring(entry.name.lastIndexOf("."));
+                // Collect key source files for analysis (first 50 lines each, max 15 files)
+                if (codeExtensions.has(ext) && keyFiles.length < 15) {
+                  const content = readFile(fullPath);
+                  if (content.length > 50) {
+                    keyFiles.push({ path: relPath, content: content.split("\n").slice(0, 50).join("\n") });
+                  }
+                }
+              }
+            }
+          } catch { /* skip unreadable dirs */ }
+        };
+        walk(cloneDir, 0);
+
+        // Parse package.json for dependencies
+        let deps = "";
+        if (pkgJson) {
+          try {
+            const pkg = JSON.parse(pkgJson);
+            const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+            deps = Object.keys(allDeps).slice(0, 20).join(", ");
+          } catch { /* ignore */ }
+        }
+
+        await updateJobPersistent(jobId, {
+          progress: 7,
+          message: "Deep analyzing code with Gemini...",
+        });
+
+        // Use Gemini to create a deep analysis of the repo
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const analysisPrompt = [
+          `Analyze this GitHub repository and write a compelling, detailed summary that would make an amazing editorial video. Focus on: what the project does, why it matters, key technical innovations, architecture highlights, and who it's for.`,
+          "",
+          `## Repository: ${ghParsed.owner}/${ghParsed.repo}`,
+          "",
+          readme ? `## README\n${readme.slice(0, 6000)}` : "",
+          claudeMd ? `## Project Rules\n${claudeMd.slice(0, 3000)}` : "",
+          "",
+          `## File Structure (${fileTree.length} files)\n${fileTree.slice(0, 60).join("\n")}`,
+          "",
+          deps ? `## Dependencies\n${deps}` : "",
+          "",
+          keyFiles.length > 0 ? `## Key Source Files\n${keyFiles.map(f => `### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``).join("\n\n")}` : "",
+          "",
+          `Write a rich, editorial-quality analysis covering:`,
+          `1. Project vision and purpose (what problem does it solve?)`,
+          `2. Technical architecture (how is it built? what's innovative?)`,
+          `3. Key features and capabilities (what can it do?)`,
+          `4. Technology stack and why those choices matter`,
+          `5. Target audience and impact`,
+          `6. What makes this project special or unique`,
+          "",
+          `Write in a premium editorial voice — confident, specific, vivid. This will be turned into a motion graphics video.`,
+        ].filter(Boolean).join("\n");
+
+        const analysisResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: analysisPrompt,
+        });
+        const analysis = analysisResponse.text ?? "";
+
+        // Combine everything into the enriched prompt
         const meta = await fetchGitHubMetadata(ghParsed.owner, ghParsed.repo);
         enrichedPrompt = [
           `# ${meta.name}`,
-          "",
           meta.description,
-          "",
           `Language: ${meta.language} | Stars: ${meta.stars}`,
           meta.topics.length > 0 ? `Topics: ${meta.topics.join(", ")}` : "",
           "",
+          "## Deep Analysis",
+          analysis,
+          "",
           meta.features.length > 0 ? `## Key Features\n${meta.features.map(f => `- ${f}`).join("\n")}` : "",
           "",
-          meta.readmeContent.slice(0, 4000),
+          `## Architecture\nFile structure: ${fileTree.length} files across ${fileTree.filter(f => f.endsWith("/")).length} directories`,
+          deps ? `Dependencies: ${deps}` : "",
         ].filter(Boolean).join("\n");
-        console.log(`[Editorial] Fetched GitHub repo ${ghParsed.owner}/${ghParsed.repo}: ${meta.name} (${meta.stars} stars, ${meta.language})`);
+
+        console.log(`[Editorial] Deep analysis complete for ${ghParsed.owner}/${ghParsed.repo}: ${analysis.length} chars, ${fileTree.length} files scanned`);
+
+        // Cleanup clone
+        execSync(`rm -rf ${cloneDir}`, { stdio: "pipe" });
       } catch (err) {
-        console.warn(`[Editorial] GitHub fetch failed, using URL as prompt: ${err instanceof Error ? err.message : err}`);
+        console.warn(`[Editorial] Deep GitHub analysis failed, falling back to API: ${err instanceof Error ? err.message : err}`);
+        // Fallback: use basic API metadata
+        try {
+          const meta = await fetchGitHubMetadata(ghParsed.owner, ghParsed.repo);
+          enrichedPrompt = [
+            `# ${meta.name}`, meta.description,
+            `Language: ${meta.language} | Stars: ${meta.stars}`,
+            meta.features.length > 0 ? `## Key Features\n${meta.features.map(f => `- ${f}`).join("\n")}` : "",
+            meta.readmeContent.slice(0, 4000),
+          ].filter(Boolean).join("\n");
+        } catch { /* use raw prompt */ }
       }
     } else if (/youtube\.com|youtu\.be/.test(prompt)) {
       await updateJobPersistent(jobId, {
