@@ -5,6 +5,7 @@ import { useState } from "react";
 import PromptInput from "@/components/PromptInput";
 import TemplatePicker from "@/components/TemplatePicker";
 import AssetUploader from "@/components/AssetUploader";
+import Navbar from "@/components/Navbar";
 import type { TemplateId } from "@/lib/types";
 
 export default function Home() {
@@ -52,6 +53,8 @@ export default function Home() {
 
   return (
     <div className="relative min-h-screen flex flex-col">
+      <Navbar />
+
       {/* Animated gradient mesh background */}
       <div
         className="fixed inset-0 -z-10"
@@ -65,13 +68,16 @@ export default function Home() {
       />
 
       {/* Hero section */}
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-20">
+      <main className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-20">
         <div className="mb-14 text-center animate-fade-in">
           <h1
             className="font-serif text-display-lg opacity-0 animate-fade-in-up"
             style={{ animationFillMode: "forwards" }}
           >
-            Create Videos with AI
+            Transform Ideas Into{" "}
+            <span className="bg-gradient-to-r from-[#cdbdff] to-[#9ccaff] bg-clip-text text-transparent">
+              Cinema
+            </span>
           </h1>
           <p
             className="mx-auto mt-5 max-w-2xl text-body-md opacity-0 animate-fade-in-up delay-2"
@@ -88,6 +94,13 @@ export default function Home() {
           style={{ animationFillMode: "forwards" }}
         >
           <PromptInput onSubmit={handleSubmit} isLoading={isLoading} />
+
+          <p
+            className="text-label-md opacity-0 animate-fade-in-up delay-3"
+            style={{ animationFillMode: "forwards" }}
+          >
+            Choose a Template
+          </p>
           <TemplatePicker
             selected={templateId}
             onChange={setTemplateId}
@@ -204,9 +217,21 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="pb-8 text-center">
+      <footer className="pb-8 text-center px-6">
+        <div
+          className="mx-auto mb-6 max-w-4xl"
+          style={{
+            height: "1px",
+            background: "rgba(73, 68, 86, 0.1)",
+          }}
+        />
         <p className="text-sm text-[var(--outline)]">
-          Powered by Gemini, Veo, and Remotion
+          Powered by{" "}
+          <span className="text-[var(--on-surface-variant)]">Gemini</span>
+          {" \u00B7 "}
+          <span className="text-[var(--on-surface-variant)]">Veo</span>
+          {" \u00B7 "}
+          <span className="text-[var(--on-surface-variant)]">Remotion</span>
         </p>
       </footer>
     </div>
