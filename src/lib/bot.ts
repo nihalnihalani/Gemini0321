@@ -11,7 +11,8 @@ const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // Store pending inputs per chat: user sends text/images, then picks a template
 interface PendingInput {
-  input: string;
+  input: string;       // full user message (used as prompt context)
+  sourceUrl?: string;  // extracted URL (YouTube/GitHub) — separate from prompt text
   inputType: SourceType;
   assets: string[];
 }
@@ -27,47 +28,82 @@ const pendingInputs: Map<number, PendingInput> =
 // -- Telegram API helpers --
 
 async function sendMessage(chatId: number, text: string, extra?: Record<string, unknown>) {
-  await fetch(`${API_BASE}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
-  });
-}
-
-async function sendVideo(chatId: number, videoUrl: string, caption?: string) {
-  const res = await fetch(`${API_BASE}/sendVideo`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      video: videoUrl,
-      caption,
-      supports_streaming: true,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.warn("sendVideo failed:", err);
+  try {
+    await fetch(`${API_BASE}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    console.warn("sendMessage failed:", err);
   }
 }
 
+async function sendVideo(chatId: number, videoUrl: string, caption?: string) {
+  const MAX_RETRIES = 4;
+  const RETRY_DELAY_MS = 5_000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/sendVideo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          video: videoUrl,
+          caption,
+          supports_streaming: true,
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+
+      if (res.ok) return;
+
+      const err = await res.json().catch(() => ({}));
+      console.warn(`sendVideo attempt ${attempt} failed (HTTP ${res.status}):`, err);
+    } catch (err) {
+      console.warn(`sendVideo attempt ${attempt} failed (network):`, err);
+    }
+
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+
+  // All retries exhausted — send the URL as a text message fallback
+  console.warn("sendVideo exhausted retries, falling back to text message");
+  await sendMessage(chatId, `✅ Your video is ready:\n${videoUrl}`);
+}
+
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
-  await fetch(`${API_BASE}/answerCallbackQuery`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
-  });
+  try {
+    await fetch(`${API_BASE}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    console.warn("answerCallbackQuery failed:", err);
+  }
 }
 
 // -- Input type detection --
 
+// Extracts the first URL found in a string
+function extractUrl(text: string): string | undefined {
+  const match = text.match(/https?:\/\/\S+/);
+  return match?.[0];
+}
+
 function detectInputType(text: string): { type: SourceType; url?: string } {
-  if (extractYouTubeId(text)) {
-    return { type: "youtube", url: text.trim() };
+  const url = extractUrl(text);
+  if (url && extractYouTubeId(url)) {
+    return { type: "youtube", url };
   }
-  if (parseGitHubUrl(text)) {
-    return { type: "github", url: text.trim() };
+  if (url && parseGitHubUrl(url)) {
+    return { type: "github", url };
   }
   return { type: "prompt" };
 }
@@ -106,7 +142,7 @@ async function processAndSendVideo(
   const jobId = createJob(pending.input, "720p", 5, {
     templateId,
     sourceType: pending.inputType,
-    sourceUrl: pending.inputType !== "prompt" ? pending.input.trim() : undefined,
+    sourceUrl: pending.sourceUrl,
     assets: pending.assets.length > 0 ? pending.assets : undefined,
   });
 
@@ -122,10 +158,10 @@ async function processAndSendVideo(
     if (status.stage !== lastStage) {
       lastStage = status.stage;
       const stageLabel: Record<string, string> = {
-        generating_script: "Writing script...",
-        generating_clips: "Generating video clips...",
-        uploading_assets: "Uploading assets...",
-        composing_video: "Composing final video...",
+        generating_script: "✍️ Analyzing content and writing script...",
+        generating_clips: "🎥 Generating video clips...",
+        uploading_assets: "☁️ Uploading assets...",
+        composing_video: "🎞️ Composing final video...",
       };
       if (stageLabel[status.stage]) {
         await sendMessage(chatId, stageLabel[status.stage]);
@@ -208,6 +244,7 @@ export async function handleTelegramUpdate(update: Record<string, unknown>) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_id: photo.file_id }),
+      signal: AbortSignal.timeout(15_000),
     });
     const fileData = await fileRes.json() as { result?: { file_path?: string } };
     const filePath = fileData.result?.file_path;
@@ -243,6 +280,7 @@ export async function handleTelegramUpdate(update: Record<string, unknown>) {
   const existing = pendingInputs.get(chatId);
   pendingInputs.set(chatId, {
     input: text,
+    sourceUrl: url,
     inputType: type,
     assets: existing?.assets ?? [],
   });

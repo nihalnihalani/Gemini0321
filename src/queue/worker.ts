@@ -1,11 +1,10 @@
-import { generateScript, generateTemplateContent } from "@/lib/gemini";
+import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
 import { generateMusic } from "@/lib/lyria";
 import { renderVideo, renderTemplateVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
-import { extractYouTubeContent } from "@/lib/youtube";
 import { extractGitHubContent } from "@/lib/github";
 import { getTemplate } from "@/lib/templates";
 import { mkdir } from "fs/promises";
@@ -371,17 +370,14 @@ export async function processJob(
     };
 
     try {
-      const musicPath = await generateMusic(script.music_prompt, {
-        durationSeconds: script.total_duration_seconds,
-        mood: script.scenes[0]?.mood,
-      });
-      const musicKey = generateKey(jobId, "music.wav");
+      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
+      const musicKey = generateKey(jobId, "music.mp3");
       const musicUrl = await uploadFile(musicPath, musicKey);
       generatedScript.musicUrl = musicUrl;
-      console.log(`Music generated and uploaded: ${musicUrl}`);
+      console.log(`Music uploaded: ${musicUrl}`);
     } catch (err) {
       const musicError = err instanceof Error ? err.message : String(err);
-      console.error(`Music generation failed: ${musicError}`);
+      console.error(`Music upload failed: ${musicError}`);
       await updateJobPersistent(jobId, {
         message: `Music generation failed (video will have no background music): ${musicError}`,
       });
@@ -475,8 +471,9 @@ async function processTemplateJob(
     let sourceContent = prompt;
 
     if (sourceType === "youtube" && sourceUrl) {
-      const ytMeta = await extractYouTubeContent(sourceUrl);
-      sourceContent = `Title: ${ytMeta.title}\nChannel: ${ytMeta.channelName}\nDescription: ${ytMeta.description}\n\nUser prompt: ${prompt}`;
+      console.log(`Analyzing YouTube video with Gemini: ${sourceUrl}`);
+      const ytAnalysis = await analyzeYouTubeVideo(sourceUrl);
+      sourceContent = `YouTube Video Analysis:\n${ytAnalysis}\n\nUser prompt: ${prompt}`;
     } else if (sourceType === "github" && sourceUrl) {
       const ghMeta = await extractGitHubContent(sourceUrl);
       sourceContent = `Repository: ${ghMeta.name}\nDescription: ${ghMeta.description}\nLanguage: ${ghMeta.language}\nStars: ${ghMeta.stars}\nTopics: ${ghMeta.topics.join(", ")}\nFeatures: ${ghMeta.features.join(", ")}\nREADME:\n${ghMeta.readmeContent.slice(0, 2000)}\n\nUser prompt: ${prompt}`;
@@ -650,11 +647,11 @@ async function processTemplateJob(
     let sfxUrls = new Map<number, string>();
 
     const [musicResult, narrationResult, sfxResult] = await Promise.allSettled([
-      // Music generation
-      generateMusic(moodMap[templateId], {
-        durationSeconds: template.defaultDurationSeconds,
-        mood: moodMap[templateId],
-      }),
+      // Music: use local MP3 directly
+      uploadFile(
+        "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3",
+        generateKey(jobId, "music.mp3")
+      ),
       // Narration generation
       templateScenes.length > 0 ? generateAllNarrations(templateScenes) : Promise.resolve(new Map<number, string>()),
       // SFX generation
@@ -663,15 +660,10 @@ async function processTemplateJob(
 
     // Process music result
     if (musicResult.status === "fulfilled") {
-      try {
-        const musicKey = generateKey(jobId, "music.wav");
-        musicUrl = await uploadFile(musicResult.value, musicKey);
-        console.log(`Music generated and uploaded: ${musicUrl}`);
-      } catch (err) {
-        console.error(`Music upload failed: ${err instanceof Error ? err.message : err}`);
-      }
+      musicUrl = musicResult.value;
+      console.log(`Music uploaded: ${musicUrl}`);
     } else {
-      console.error(`Music generation failed: ${musicResult.reason instanceof Error ? musicResult.reason.message : musicResult.reason}`);
+      console.error(`Music upload failed: ${musicResult.reason instanceof Error ? musicResult.reason.message : musicResult.reason}`);
     }
 
     // Process narration result

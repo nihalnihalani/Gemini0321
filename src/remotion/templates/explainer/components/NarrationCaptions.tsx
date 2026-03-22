@@ -4,6 +4,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
   spring,
+  interpolate,
 } from "remotion";
 
 interface NarrationCaptionsProps {
@@ -17,8 +18,8 @@ interface NarrationCaptionsProps {
 
 export const NarrationCaptions: React.FC<NarrationCaptionsProps> = ({
   text,
-  fontSize = 32,
-  color = "rgba(255, 255, 255, 0.6)",
+  fontSize = 30,
+  color = "rgba(255, 255, 255, 0.5)",
   activeColor = "#a855f7",
   position = "bottom",
   showBackground = true,
@@ -29,86 +30,75 @@ export const NarrationCaptions: React.FC<NarrationCaptionsProps> = ({
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length === 0) return null;
 
-  // Calculate timing: distribute words evenly across the scene duration
-  // Leave a small buffer at start (15 frames) and end (15 frames)
-  const startBuffer = 15;
-  const endBuffer = 15;
-  const activeFrames = durationInFrames - startBuffer - endBuffer;
+  // Timing: words distributed across scene with buffers
+  const startBuffer = 20;
+  const endBuffer = 20;
+  const activeFrames = Math.max(1, durationInFrames - startBuffer - endBuffer);
   const framesPerWord = Math.max(1, activeFrames / words.length);
 
-  // Current word index based on frame
   const adjustedFrame = Math.max(0, frame - startBuffer);
   const currentWordIndex = Math.min(
     Math.floor(adjustedFrame / framesPerWord),
     words.length - 1
   );
 
-  // Only show words that have been "revealed" so far
-  const revealedCount = frame < startBuffer ? 0 : currentWordIndex + 1;
+  // Don't show before start buffer
+  if (frame < startBuffer) return null;
 
-  // Group words into lines of 6-8 words for readability
-  const wordsPerLine = 7;
+  // Group visible words into lines of ~6 words
+  const wordsPerLine = 6;
   const currentLineStart =
     Math.floor(currentWordIndex / wordsPerLine) * wordsPerLine;
-  const visibleWords = words.slice(
-    currentLineStart,
-    currentLineStart + wordsPerLine
-  );
+  const currentLineEnd = Math.min(currentLineStart + wordsPerLine, words.length);
+  const visibleWords = words.slice(currentLineStart, currentLineEnd);
   const lineOffset = currentLineStart;
+
+  // Caption container fade-in
+  const captionOpacity = interpolate(frame, [startBuffer, startBuffer + 10], [0, 1], {
+    extrapolateRight: "clamp",
+  });
 
   const positionStyle: React.CSSProperties =
     position === "bottom"
-      ? { justifyContent: "flex-end", paddingBottom: 60 }
+      ? { justifyContent: "flex-end", paddingBottom: 48 }
       : { justifyContent: "center" };
 
   return (
-    <AbsoluteFill style={{ ...positionStyle, alignItems: "center" }}>
-      {showBackground && revealedCount > 0 && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: position === "bottom" ? 40 : "auto",
-            left: "10%",
-            right: "10%",
-            padding: "16px 24px",
-            borderRadius: 12,
-            backgroundColor: "rgba(0, 0, 0, 0.65)",
-            backdropFilter: "blur(8px)",
-          }}
-        />
-      )}
+    <AbsoluteFill
+      style={{
+        ...positionStyle,
+        alignItems: "center",
+        opacity: captionOpacity,
+      }}
+    >
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
           justifyContent: "center",
-          gap: "6px 10px",
-          maxWidth: "80%",
-          padding: "16px 32px",
-          position: "relative",
-          zIndex: 1,
+          gap: "4px 8px",
+          maxWidth: "75%",
+          padding: showBackground ? "14px 28px" : "14px 0",
+          borderRadius: showBackground ? 14 : 0,
+          backgroundColor: showBackground ? "rgba(0, 0, 0, 0.55)" : "transparent",
         }}
       >
         {visibleWords.map((word, idx) => {
           const globalIdx = lineOffset + idx;
           const isActive = globalIdx === currentWordIndex;
           const isPast = globalIdx < currentWordIndex;
-          const isFuture = globalIdx > currentWordIndex;
-
-          // Don't show future words
-          if (isFuture && globalIdx >= revealedCount) return null;
 
           const wordStartFrame = startBuffer + globalIdx * framesPerWord;
           const localFrame = Math.max(0, frame - wordStartFrame);
 
           const wordScale = isActive
-            ? spring({
-                frame: localFrame,
-                fps,
-                config: { damping: 15, stiffness: 200 },
-              }) *
-                0.1 +
-              1.0
+            ? 1.0 +
+              0.08 *
+                spring({
+                  frame: localFrame,
+                  fps,
+                  config: { damping: 18, stiffness: 200 },
+                })
             : 1.0;
 
           return (
@@ -116,12 +106,16 @@ export const NarrationCaptions: React.FC<NarrationCaptionsProps> = ({
               key={globalIdx}
               style={{
                 fontSize,
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? activeColor : isPast ? color : "transparent",
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontWeight: isActive ? 700 : isPast ? 500 : 400,
+                color: isActive
+                  ? activeColor
+                  : isPast
+                    ? "rgba(255, 255, 255, 0.8)"
+                    : color,
                 transform: `scale(${wordScale})`,
                 display: "inline-block",
-                lineHeight: 1.6,
+                lineHeight: 1.5,
               }}
             >
               {word}

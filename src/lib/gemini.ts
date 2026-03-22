@@ -196,6 +196,44 @@ const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
 };
 
 /**
+ * Analyze a YouTube video directly with Gemini 2.5 Flash.
+ * Returns a rich text summary — no YouTube API key required.
+ */
+export async function analyzeYouTubeVideo(youtubeUrl: string): Promise<string> {
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            fileData: {
+              fileUri: youtubeUrl,
+            },
+          },
+          {
+            text: `Analyze this video thoroughly and extract the following information:
+- Title and main topic
+- Key points, features, or arguments presented
+- Target audience
+- Tone and style (educational, promotional, entertaining, etc.)
+- Any products, brands, or technologies mentioned
+- Main narrative or story arc
+- Key quotes or memorable phrases
+
+Provide a detailed, structured summary that captures the essence of the video content. This will be used to generate a new video based on this content.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("Gemini returned empty response for YouTube analysis");
+  return text;
+}
+
+/**
  * Generate structured template content using Gemini.
  * Takes extracted source content and produces typed template input.
  */
