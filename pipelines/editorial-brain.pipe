@@ -1,0 +1,74 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "mode": "Source",
+        "parameters": {
+          "endpoint": "/editorial-brain",
+          "host": "0.0.0.0",
+          "port": 5569
+        },
+        "type": "webhook"
+      },
+      "input": []
+    },
+    {
+      "id": "question_1",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Role",
+            "instruction": "You are an editorial video planner. You plan elegant, restrained motion videos from source material. Your output is a structured JSON plan with 5-8 beat directives that form a cohesive narrative arc."
+          },
+          {
+            "title": "Style",
+            "instruction": "Style should be restrained, elegant, neat, premium. Avoid dense copy — max 4 words per fragment. Use rhythms: whisper (scattered text), hold (sustained text+image), reveal (text+image with motion), contrast (split layout), blank (breathing room)."
+          }
+        ]
+      },
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ]
+    },
+    {
+      "id": "gemini_1",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
+      },
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_1"
+        }
+      ]
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {
+        "keys": {
+          "answers": "answers"
+        }
+      },
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_1"
+        }
+      ]
+    }
+  ]
+}

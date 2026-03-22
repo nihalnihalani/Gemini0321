@@ -3,6 +3,7 @@ import { renderMedia, selectComposition } from "@remotion/renderer";
 import path from "path";
 import os from "os";
 import type { GeneratedScript, CompositionStyle, TemplateId, TemplateInput } from "./types";
+import type { EditorialVideoSpec } from "../editorial/types";
 import { DEFAULT_STYLE } from "./types";
 import { getTemplate } from "./templates";
 
@@ -129,6 +130,45 @@ export async function renderTemplateVideo(
     outputLocation: outputPath,
     inputProps: props,
     ...getSharedRenderOptions(),
+  });
+
+  return outputPath;
+}
+
+/**
+ * Render an editorial video from a compiled EditorialVideoSpec.
+ * The spec contains its own fps, resolution, and duration — all metadata-driven.
+ */
+export async function renderEditorialVideo(
+  spec: EditorialVideoSpec,
+  outputPath: string
+): Promise<string> {
+  const bundled = await getBundle();
+
+  const composition = await selectComposition({
+    serveUrl: bundled,
+    id: "EditorialVideo",
+    inputProps: { spec },
+  });
+
+  const finalComposition = {
+    ...composition,
+    width: spec.meta.width,
+    height: spec.meta.height,
+    fps: spec.meta.fps,
+    durationInFrames: spec.meta.durationInFrames,
+  };
+
+  await renderMedia({
+    composition: finalComposition,
+    serveUrl: bundled,
+    outputLocation: outputPath,
+    inputProps: { spec },
+    ...getSharedRenderOptions(),
+    // Lower concurrency for higher resolution specs
+    concurrency: spec.meta.width > 1920
+      ? Math.max(1, Math.min(4, Math.floor(os.cpus().length / 4)))
+      : getOptimalConcurrency(),
   });
 
   return outputPath;

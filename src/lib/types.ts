@@ -168,7 +168,7 @@ export interface GenerateResponse {
 }
 
 // Template system types
-export type TemplateId = 'product-launch' | 'explainer' | 'social-promo' | 'brand-story';
+export type TemplateId = 'product-launch' | 'explainer' | 'social-promo' | 'brand-story' | 'editorial';
 export type TemplateIdOrCustom = TemplateId | 'custom';
 
 export interface ProductLaunchInput {
@@ -208,7 +208,13 @@ export interface BrandStoryInput {
   logoUrl?: string;
 }
 
-export type TemplateInput = ProductLaunchInput | ExplainerInput | SocialPromoInput | BrandStoryInput;
+export interface EditorialInput {
+  prompt: string;
+  brainMode?: 'rule-based' | 'llm';
+  resolution?: '1080p' | '4k';
+}
+
+export type TemplateInput = ProductLaunchInput | ExplainerInput | SocialPromoInput | BrandStoryInput | EditorialInput;
 
 export interface TemplateConfig {
   id: TemplateId;

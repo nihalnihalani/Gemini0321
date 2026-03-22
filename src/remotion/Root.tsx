@@ -12,6 +12,7 @@ import { SocialPromo } from "./templates/social-promo/SocialPromo";
 import { SocialPromoSchema } from "./templates/social-promo/schema";
 import { BrandStory } from "./templates/brand-story/BrandStory";
 import { BrandStorySchema } from "./templates/brand-story/schema";
+import { EditorialVideo } from "./compositions/EditorialVideo";
 
 const sceneSchema = z.object({
   scene_number: z.number(),
@@ -189,6 +190,40 @@ const RemotionRoot: React.FC = () => {
           const totalSeconds = 5 + milestoneDuration + 4 + 5;
           return { durationInFrames: totalSeconds * FPS };
         }}
+      />
+      {/* Editorial Video — polished beat-driven motion graphics */}
+      <Composition
+        id="EditorialVideo"
+        component={EditorialVideo}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          spec: {
+            meta: {
+              title: "Editorial Preview",
+              fps: 30,
+              width: 1920,
+              height: 1080,
+              durationInFrames: 900,
+              durationSec: 30,
+              audioMode: "silent",
+              preset: "editorial-generator",
+              background: "#f4ede4",
+              ink: "#15120f",
+              fontFamily: "Manrope, SF Pro Display, system-ui, sans-serif",
+            },
+            assets: [],
+            beats: [],
+            anchors: [],
+          },
+        }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: props.spec.meta.durationInFrames,
+          fps: props.spec.meta.fps,
+          width: props.spec.meta.width,
+          height: props.spec.meta.height,
+        })}
       />
     </>
   );

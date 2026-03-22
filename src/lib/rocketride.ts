@@ -1,7 +1,7 @@
 import { RocketRideClient } from "rocketride";
 import type { Script, TemplateId, SourceType, TemplateInput } from "./types";
 import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema } from "./schemas";
-import type { z } from "zod";
+import { z } from "zod";
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -35,6 +35,7 @@ const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
   "explainer": ExplainerInputSchema,
   "social-promo": SocialPromoInputSchema,
   "brand-story": BrandStoryInputSchema,
+  "editorial": z.object({ prompt: z.string() }),
 };
 
 function isEnabled(): boolean {
@@ -280,6 +281,72 @@ export async function runTemplateContentPipeline(
       return schema.parse(data) as TemplateInput;
     }
     return data as TemplateInput;
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+/**
+ * Run the editorial brain pipeline for LLM-based narrative planning.
+ * Returns the raw LLM response which is parsed by brain.ts's buildPlanFromLLMObject().
+ */
+export async function runEditorialBrainPipeline(
+  planningPrompt: string,
+  onToken?: (token: string) => void
+): Promise<unknown> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("editorial-brain.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start editorial-brain pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const prompt = `${planningPrompt}
+
+Return strict JSON with:
+{
+  "intent": { "promise": string, "tone": string, "visualAnchor": string, "audience": string },
+  "orderedSectionIds": string[],
+  "directives": Array<{
+    "id": string,
+    "role": "hook" | "hero" | "detail" | "contrast" | "close" | "breather",
+    "sectionId"?: string,
+    "rhythm": "whisper" | "hold" | "reveal" | "contrast" | "blank",
+    "copyFragments": string[],
+    "assetRole"?: "hero_object" | "detail_crop" | "context_frame" | "closing_object",
+    "granularity"?: "phrase" | "word" | "letter",
+    "layoutHint"?: "center" | "hero-top" | "gallery-left" | "gallery-right" | "full-bleed" | "contrast-split",
+    "transitionHint"?: "gentle" | "crisp" | "glide" | "lift",
+    "durationSec": number
+  }>
+}
+
+Rules:
+- 5 to 8 directives only
+- target 30 to 45 seconds total
+- max 4 words per fragment
+- restrained, elegant style`;
+
+    const result = await withTimeout(
+      rc.send(token, prompt, { name: "prompt.txt" }, "text/plain"),
+      SEND_TIMEOUT_MS,
+      "Editorial brain planning"
+    );
+
+    if (!result) {
+      throw new Error("[RocketRide] Editorial brain pipeline returned no result");
+    }
+
+    return extractResultData(result as Record<string, unknown>);
   } finally {
     activePipelines--;
     await safeTerminate(rc, token);

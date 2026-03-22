@@ -3,7 +3,7 @@ import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
-import { renderVideo, renderTemplateVideo } from "@/lib/render";
+import { renderVideo, renderTemplateVideo, renderEditorialVideo } from "@/lib/render";
 import { uploadFile, generateKey } from "@/lib/storage";
 import { extractGitHubContent } from "@/lib/github";
 import { getTemplate } from "@/lib/templates";
@@ -64,8 +64,10 @@ export function createJob(
 
   const engine: GenerationEngine = options?.engine ?? "auto";
 
-  // Use template pipeline if templateId provided, otherwise freestyle/custom
-  if (options?.templateId) {
+  // Route to the appropriate pipeline
+  if (options?.templateId === "editorial") {
+    processEditorialJob(jobId, prompt, resolution);
+  } else if (options?.templateId) {
     processTemplateJob(jobId, prompt, resolution, options);
   } else {
     processJob(jobId, prompt, resolution, sceneCount, engine);
@@ -585,6 +587,7 @@ async function processTemplateJob(
       "explainer": "calm, educational, light ambient",
       "social-promo": "bold, upbeat, trendy pop",
       "brand-story": "inspiring, cinematic, emotional orchestral",
+      "editorial": "elegant, restrained, quiet ambient",
     };
 
     // Build scenes for narration + SFX from template content
@@ -814,6 +817,119 @@ async function processTemplateJob(
       stage: "completed",
       progress: 100,
       message: "Video generation completed",
+      downloadUrl,
+    });
+  } catch (error) {
+    await updateJobPersistent(jobId, {
+      stage: "failed",
+      message: error instanceof Error ? error.message : "An unknown error occurred",
+      error: error instanceof Error ? error.message : "An unknown error occurred",
+    });
+  }
+}
+
+/**
+ * Editorial video generation pipeline.
+ * Uses the editorial engine (source → brain → director → compiler → Remotion render).
+ */
+async function processEditorialJob(
+  jobId: string,
+  prompt: string,
+  resolution: string,
+): Promise<void> {
+  try {
+    // Stage 1: Build editorial spec via the engine pipeline (0-40%)
+    await updateJobPersistent(jobId, {
+      stage: "generating_script",
+      progress: 5,
+      message: "Planning editorial structure...",
+    });
+
+    const { buildEditorialEngineResult } = await import("@/editorial/engine");
+
+    // Try RocketRide LLM brain, fall back to rule-based
+    let llmPlanResult: unknown = undefined;
+    try {
+      const { buildLLMPlanningPrompt } = await import("@/editorial/engine");
+      const { resolveEditorialSource } = await import("@/editorial/source");
+      const { runEditorialBrainPipeline } = await import("@/lib/rocketride");
+
+      const source = resolveEditorialSource(prompt);
+      llmPlanResult = await runEditorialBrainPipeline(
+        buildLLMPlanningPrompt(source),
+        (token) => { updateJob(jobId, { rocketrideToken: token }); }
+      );
+      console.log(`[Editorial] LLM brain plan generated via RocketRide for job ${jobId}`);
+    } catch (rrError) {
+      console.warn(
+        `[Editorial] RocketRide brain unavailable, using rule-based planning: ${rrError instanceof Error ? rrError.message : rrError}`
+      );
+    } finally {
+      updateJob(jobId, { rocketrideToken: undefined });
+    }
+
+    checkCancelled(jobId);
+    await updateJobPersistent(jobId, {
+      progress: 20,
+      message: "Compiling editorial beat sheet...",
+    });
+
+    const result = await buildEditorialEngineResult(prompt, {
+      brainMode: llmPlanResult ? "llm" : "rule-based",
+      llmPlanResult,
+      preset: "editorial-generator",
+    });
+
+    checkCancelled(jobId);
+    await updateJobPersistent(jobId, {
+      progress: 40,
+      message: `Editorial spec compiled: ${result.spec.beats.length} beats, ${result.spec.meta.durationSec.toFixed(1)}s`,
+    });
+
+    // Log diagnostics
+    const allWarnings = [
+      ...result.diagnostics.plan.warnings,
+      ...result.diagnostics.beatSheet.warnings,
+      ...result.diagnostics.spec.warnings,
+    ];
+    if (allWarnings.length > 0) {
+      console.warn(`[Editorial] Diagnostics: ${allWarnings.join("; ")}`);
+    }
+
+    // Stage 2: Render with Remotion (40-90%)
+    checkCancelled(jobId);
+    await updateJobPersistent(jobId, {
+      stage: "composing_video",
+      progress: 45,
+      message: "Rendering editorial video with Remotion...",
+    });
+
+    const renderDir = "/tmp/renders";
+    await mkdir(renderDir, { recursive: true });
+    const outputPath = `${renderDir}/${jobId}.mp4`;
+
+    const renderStart = Date.now();
+    console.log(`[Editorial] Starting Remotion render for job ${jobId}...`);
+
+    await renderEditorialVideo(result.spec, outputPath);
+
+    const renderDuration = ((Date.now() - renderStart) / 1000).toFixed(1);
+    console.log(`[Editorial] Render completed in ${renderDuration}s for job ${jobId}`);
+
+    // Stage 3: Upload (90-100%)
+    checkCancelled(jobId);
+    await updateJobPersistent(jobId, {
+      progress: 92,
+      message: "Uploading final video...",
+    });
+
+    const downloadKey = generateKey(jobId, "final.mp4");
+    const downloadUrl = await uploadFile(outputPath, downloadKey);
+
+    await updateJobPersistent(jobId, {
+      stage: "completed",
+      progress: 100,
+      message: "Editorial video completed",
       downloadUrl,
     });
   } catch (error) {

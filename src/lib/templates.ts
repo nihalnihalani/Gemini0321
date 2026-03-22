@@ -33,6 +33,14 @@ export const TEMPLATES: Record<TemplateId, TemplateConfig> = {
     defaultAspectRatio: "16:9",
     compositionId: "BrandStory",
   },
+  "editorial": {
+    id: "editorial",
+    name: "Editorial",
+    description: "Polished editorial motion graphics with beat-driven animation and text choreography.",
+    defaultDurationSeconds: 38,
+    defaultAspectRatio: "16:9",
+    compositionId: "EditorialVideo",
+  },
 };
 
 export function getTemplate(id: TemplateId): TemplateConfig {

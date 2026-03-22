@@ -186,6 +186,7 @@ const TEMPLATE_PROMPTS: Record<TemplateId, string> = {
   "explainer": EXPLAINER_PROMPT,
   "social-promo": SOCIAL_PROMO_PROMPT,
   "brand-story": BRAND_STORY_PROMPT,
+  "editorial": "", // Editorial uses its own engine pipeline, not direct Gemini
 };
 
 const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
@@ -193,6 +194,7 @@ const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
   "explainer": ExplainerInputSchema,
   "social-promo": SocialPromoInputSchema,
   "brand-story": BrandStoryInputSchema,
+  "editorial": z.object({ prompt: z.string() }), // Minimal schema — editorial has its own validation
 };
 
 /**
