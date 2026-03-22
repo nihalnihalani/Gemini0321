@@ -10,6 +10,10 @@ export const ExplainerSchema = z.object({
     })
   ),
   conclusion: z.string(),
+  introNarration: z.string().optional(),
+  summaryNarration: z.string().optional(),
+  narrationUrls: z.record(z.string()).optional(),
+  sfxUrls: z.record(z.string()).optional(),
   musicUrl: z.string().optional(),
 });
 

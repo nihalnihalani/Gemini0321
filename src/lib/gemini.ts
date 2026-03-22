@@ -97,6 +97,8 @@ Given a topic, concept, or content, generate:
   - description: Clear, jargon-free explanation (1-2 sentences, max 30 words). Write for a smart 16-year-old — precise but accessible. Each description should answer "what happens here and why it matters"
   - iconUrl: Leave empty (generated separately)
 - conclusion: A powerful summary that ties everything together (1-2 sentences). Should feel like the "aha moment" — the single insight the viewer walks away with.
+- introNarration: A 2-3 sentence spoken introduction that hooks the viewer and sets up the topic. Write this as if you're a charismatic teacher starting a lesson. Be conversational, use "you" and "we", ask a thought-provoking question, then preview what the viewer will learn. Example: "Have you ever wondered how your phone knows what you're saying? Well, you're about to find out. Let's break down speech recognition in just 4 simple steps."
+- summaryNarration: A 2-3 sentence spoken conclusion that ties everything together memorably. Reference the intro's hook, summarize the key insight, and leave the viewer feeling smarter. Example: "And there you have it — from sound waves to text on your screen. It turns out speech recognition isn't magic at all. It's just math, a ton of data, and a little bit of clever engineering."
 
 CRITICAL RULES:
 - Steps MUST follow a logical cause-and-effect chain — each step should naturally lead to the next
@@ -104,7 +106,11 @@ CRITICAL RULES:
 - Avoid vague language ("various", "different", "several") — be specific
 - If source content has a natural structure (list, process, timeline), mirror it
 - Title should create curiosity: "How X Works" > "About X"
-- The conclusion should reframe the topic in a new, memorable way`;
+- The conclusion should reframe the topic in a new, memorable way
+- ALL text (step descriptions, intro, summary) must be written in spoken-word style — as if narrated aloud. No bullet points, no abbreviations, no jargon without explanation
+- Step descriptions should sound natural when read by a text-to-speech engine
+- introNarration should create a "knowledge gap" — make the viewer curious before teaching
+- summaryNarration should create a satisfying "aha moment" — the viewer should feel they now understand something they didn't before`;
 
 const SOCIAL_PROMO_PROMPT = `You are a viral social media content creator who makes scroll-stopping short-form video ads — think the energy of a TikTok ad meets the polish of an Apple product reveal.
 

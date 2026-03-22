@@ -161,6 +161,11 @@ export interface ExplainerInput {
   title: string;
   steps: { title: string; description: string; iconUrl?: string }[];
   conclusion: string;
+  introNarration?: string;
+  summaryNarration?: string;
+  narrationUrls?: Record<number, string>;
+  sfxUrls?: Record<number, string>;
+  musicUrl?: string;
 }
 
 export interface SocialPromoInput {
