@@ -7,6 +7,7 @@ import type { JobStatus, CompositionStyle } from "@/lib/types";
 import { DEFAULT_STYLE } from "@/lib/types";
 import GenerationProgress from "@/components/GenerationProgress";
 import EditPanel from "@/components/EditPanel";
+import LiveChat from "@/components/LiveChat";
 
 const VideoPreview = dynamic(() => import("@/components/VideoPreview"), {
   ssr: false,
@@ -126,12 +127,17 @@ function GenerateContent() {
             )}
           </div>
 
-          {/* Right: Edit Panel */}
-          <div className="h-[500px] lg:h-auto lg:flex-1">
-            <EditPanel
-              currentStyle={compositionStyle}
-              onStyleChange={handleStyleChange}
-            />
+          {/* Right: Edit Panel + Live Chat */}
+          <div className="flex flex-col gap-6 lg:flex-1">
+            <div className="h-[300px] lg:h-[350px]">
+              <EditPanel
+                currentStyle={compositionStyle}
+                onStyleChange={handleStyleChange}
+              />
+            </div>
+            <div className="h-[300px] lg:h-[350px]">
+              <LiveChat />
+            </div>
           </div>
         </div>
       </div>

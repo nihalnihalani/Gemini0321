@@ -3,16 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PromptInput from "@/components/PromptInput";
+import TemplatePicker from "@/components/TemplatePicker";
+import AssetUploader from "@/components/AssetUploader";
+import type { TemplateId } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<TemplateId>("product-launch");
+  const [assets, setAssets] = useState<string[]>([]);
 
   async function handleSubmit(
     prompt: string,
     resolution: string,
-    sceneCount: number
+    sceneCount: number,
+    source?: { type: string; url: string }
   ) {
     setIsLoading(true);
     setError(null);
@@ -20,7 +26,15 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, resolution, sceneCount }),
+        body: JSON.stringify({
+          prompt,
+          resolution,
+          sceneCount,
+          templateId,
+          sourceType: source?.type ?? "prompt",
+          sourceUrl: source?.url,
+          assets: assets.length > 0 ? assets : undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -70,10 +84,20 @@ export default function Home() {
         </div>
 
         <div
-          className="w-full max-w-3xl opacity-0 animate-fade-in-up delay-3"
+          className="w-full max-w-3xl space-y-6 opacity-0 animate-fade-in-up delay-3"
           style={{ animationFillMode: "forwards" }}
         >
           <PromptInput onSubmit={handleSubmit} isLoading={isLoading} />
+          <TemplatePicker
+            selected={templateId}
+            onChange={setTemplateId}
+            disabled={isLoading}
+          />
+          <AssetUploader
+            assets={assets}
+            onAssetsChange={setAssets}
+            disabled={isLoading}
+          />
         </div>
 
         {error && (
