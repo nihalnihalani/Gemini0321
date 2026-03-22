@@ -262,10 +262,18 @@ export const generateBeatSheetFromPlan = (
       : new Map(source.sections.map((section) => [section.id, section]));
   const beats: NarrativeBeat[] = plan.directives.map((directive: BeatDirective) => {
     const section = directive.sectionId ? sectionLookup.get(directive.sectionId) : undefined;
-    const effectiveAssetRole =
-      directive.rhythm === "whisper" || directive.rhythm === "blank"
-        ? undefined
-        : directive.assetRole;
+    const needsAsset = directive.rhythm !== "whisper" && directive.rhythm !== "blank";
+    const defaultAssetRole: Record<string, AssetRole> = {
+      hook: "hero_object",
+      hero: "hero_object",
+      detail: "detail_crop",
+      contrast: "context_frame",
+      close: "closing_object",
+      breather: "context_frame",
+    };
+    const effectiveAssetRole = needsAsset
+      ? directive.assetRole ?? defaultAssetRole[directive.role] ?? "hero_object"
+      : undefined;
     return buildBeat(
       directive.id,
       directive.rhythm,

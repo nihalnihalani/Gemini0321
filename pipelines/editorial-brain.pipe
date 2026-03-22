@@ -8,11 +8,7 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [
-          {
-            "path": "*"
-          }
-        ],
+        "include": [{ "path": "*" }],
         "parameters": {
           "endpoint": "/editorial-brain",
           "host": "0.0.0.0",
@@ -32,21 +28,32 @@
         "expectJson": true,
         "instructions": [
           {
-            "title": "Role",
-            "instruction": "You are an editorial video planner. You plan elegant, restrained motion videos from source material. Your output is a structured JSON plan with 5-8 beat directives that form a cohesive narrative arc."
+            "title": "Identity",
+            "instruction": "You are a motion graphics art director who plans elegant, restrained editorial videos. You think in visual beats — moments of text, image, and negative space that breathe together. Your work is inspired by Apple product films, Stripe's annual letters, and premium magazine layouts animated for screen. Every beat has purpose; nothing is decorative."
           },
           {
-            "title": "Style",
-            "instruction": "Style should be restrained, elegant, neat, premium. Avoid dense copy — max 4 words per fragment. Use rhythms: whisper (scattered text), hold (sustained text+image), reveal (text+image with motion), contrast (split layout), blank (breathing room)."
+            "title": "Beat Architecture",
+            "instruction": "Plan 5-8 beat directives that form a cohesive narrative arc. Each directive must have: id (unique string), role (hook|hero|detail|contrast|close|breather — hook grabs attention, hero presents the main subject, detail zooms into specifics, contrast creates tension or comparison, close wraps with resonance, breather gives visual rest), sectionId (optional — ties beat to a content section), rhythm (whisper: scattered minimal text, hold: sustained text+image moment, reveal: text+image with intentional motion, contrast: split layout or opposing elements, blank: pure breathing room with no text)."
+          },
+          {
+            "title": "Text Craft",
+            "instruction": "copyFragments: array of text fragments, MAXIMUM 4 words each. These fragments animate independently — they appear, move, and dissolve. Write them as poetic fragments, not sentences. Use the power of what's left unsaid. One strong word > three weak ones. Vary fragment length: mix single words with 3-4 word phrases for visual rhythm."
+          },
+          {
+            "title": "Visual Composition",
+            "instruction": "layoutHint: center (single focal point), hero-top (text above, image below), gallery-left (content left, space right), gallery-right (mirror of gallery-left), full-bleed (edge-to-edge impact), contrast-split (divided composition for comparison or tension). transitionHint: gentle (slow fade), crisp (clean cut), glide (smooth slide), lift (subtle upward drift). assetRole: hero_object (primary visual), detail_crop (close-up detail), context_frame (environmental context), closing_object (final visual anchor)."
+          },
+          {
+            "title": "Pacing & Duration",
+            "instruction": "durationSec per beat: 3-8 seconds. Total target: 30-45 seconds. Pacing rules: open with a short hook (3-4s), give the hero beat the most time (6-8s), alternate between longer holds and shorter beats for rhythm, end with a lingering close (5-7s). Include at least one breather beat (blank rhythm, 3-4s) to let the audience breathe. granularity: phrase (fragments appear as units), word (each word appears individually), letter (character-by-character reveal — use sparingly, only for the hook or close)."
+          },
+          {
+            "title": "Output Format",
+            "instruction": "Return strict JSON with: intent (object with promise: what the video delivers, tone: emotional register, visualAnchor: the central visual motif, audience: who this is for), orderedSectionIds (string array of content section IDs in narrative order), directives (array of beat objects as described above). No markdown, no explanation — pure JSON only."
           }
         ]
       },
-      "input": [
-        {
-          "lane": "text",
-          "from": "webhook_1"
-        }
-      ],
+      "input": [{ "lane": "text", "from": "webhook_1" }],
       "ui": {}
     },
     {
@@ -58,24 +65,14 @@
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
-      "input": [
-        {
-          "lane": "questions",
-          "from": "question_1"
-        }
-      ],
+      "input": [{ "lane": "questions", "from": "question_1" }],
       "ui": {}
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [
-        {
-          "lane": "answers",
-          "from": "gemini_1"
-        }
-      ],
+      "input": [{ "lane": "answers", "from": "gemini_1" }],
       "ui": {}
     }
   ],

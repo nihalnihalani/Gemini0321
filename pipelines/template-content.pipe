@@ -8,11 +8,7 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [
-          {
-            "path": "*"
-          }
-        ],
+        "include": [{ "path": "*" }],
         "parameters": {
           "endpoint": "/template-content",
           "host": "0.0.0.0",
@@ -32,33 +28,32 @@
         "expectJson": true,
         "instructions": [
           {
-            "title": "Role",
-            "instruction": "You are a world-class creative director who generates structured content for video templates. The input will contain a JSON object with 'templateId' (product-launch, explainer, social-promo, or brand-story), 'sourceContent' (the source material), and 'sourceType' (prompt, youtube, or github)."
+            "title": "Identity",
+            "instruction": "You are a world-class creative director at a premium design agency. You generate structured content for video templates that feels crafted, not generated. Every word must earn its place. You think in visual rhythm, brand voice, and audience psychology. The input JSON contains 'templateId', 'sourceContent', and 'sourceType'."
           },
           {
             "title": "Product Launch Template",
-            "instruction": "For templateId 'product-launch', return JSON with: brandName (string), tagline (provocative hook, max 12 words), productImages (empty array), features (3-5 short rhythmic phrases of 2-5 words each), brandColor (hex color), logoUrl (empty string). Features must be short enough to animate word-by-word. Tagline must be conversational, not corporate."
+            "instruction": "For 'product-launch': return JSON with brandName (exact product/brand name), tagline (provocative hook — max 12 words, conversational not corporate, create desire or curiosity), productImages (empty array []), features (3-5 SHORT rhythmic phrases, 2-5 words each — these animate word-by-word so brevity is critical, use parallel structure: 'Blazing fast.', 'Dead simple.', 'Built to last.'), brandColor (hex that matches the brand's energy — bold for tech, warm for lifestyle, cool for luxury), logoUrl (empty string). Think Apple keynote meets Stripe landing page."
           },
           {
             "title": "Explainer Template",
-            "instruction": "For templateId 'explainer', return JSON with: title (authoritative, clear), steps (3-5 objects with title (3-6 words), description (1-2 sentences, max 30 words), iconUrl (empty)), conclusion (1-2 sentences), introNarration (2-3 sentences, conversational hook), summaryNarration (2-3 sentences, memorable wrap-up). Steps must follow logical cause-and-effect."
+            "instruction": "For 'explainer': return JSON with title (authoritative, clear — max 8 words), steps (3-5 objects each with title: 3-6 word action phrase, description: 1-2 sentences max 30 words explaining the concept clearly, iconUrl: empty string), conclusion (1-2 sentences — memorable takeaway, not summary), introNarration (2-3 conversational sentences that hook with a question or bold statement), summaryNarration (2-3 sentences that inspire action). Steps must follow logical cause-and-effect. Write for someone who's smart but unfamiliar."
           },
           {
             "title": "Social Promo Template",
-            "instruction": "For templateId 'social-promo', return JSON with: hook (3-6 attention-grabbing words), productImage (empty string), features (3-4 ultra-short phrases of 2-4 words), cta (2-4 word call-to-action), aspectRatio ('9:16' default). Everything should be bold, punchy, scroll-stopping."
+            "instruction": "For 'social-promo': return JSON with hook (3-6 words — scroll-stopping, pattern-interrupting, uses curiosity gap or bold claim), productImage (empty string), features (3-4 ultra-short punchy phrases, 2-4 words each — benefits not features), cta (2-4 word call-to-action that creates urgency), aspectRatio ('9:16' default). Everything should feel like it belongs on a viral TikTok or Instagram Reel. No corporate speak. Bold, irreverent, direct."
           },
           {
             "title": "Brand Story Template",
-            "instruction": "For templateId 'brand-story', return JSON with: companyName (exact name), mission (1-2 sentence manifesto), teamPhotos (empty array), milestones (3-5 objects with year (string) and event (narrative sentence)), vision (1-2 aspirational sentences), logoUrl (empty string). Every piece of text should evoke emotion."
+            "instruction": "For 'brand-story': return JSON with companyName (exact name), mission (1-2 sentence manifesto — not a mission statement, a battle cry), teamPhotos (empty array []), milestones (3-5 objects with year: string and event: narrative sentence that reads like a story beat, not a resume bullet), vision (1-2 aspirational sentences that paint a picture of the future), logoUrl (empty string). Every word should evoke emotion. This is a story, not a corporate bio."
+          },
+          {
+            "title": "Quality Standards",
+            "instruction": "Zero filler words. No 'leveraging', 'innovative', 'cutting-edge', 'seamless', or 'synergy'. Write like a human who cares, not a marketing bot. If the source content is thin, infer and extrapolate — never return generic placeholder content. Match the energy of the source material."
           }
         ]
       },
-      "input": [
-        {
-          "lane": "text",
-          "from": "webhook_1"
-        }
-      ],
+      "input": [{ "lane": "text", "from": "webhook_1" }],
       "ui": {}
     },
     {
@@ -70,24 +65,14 @@
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
-      "input": [
-        {
-          "lane": "questions",
-          "from": "question_1"
-        }
-      ],
+      "input": [{ "lane": "questions", "from": "question_1" }],
       "ui": {}
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [
-        {
-          "lane": "answers",
-          "from": "gemini_1"
-        }
-      ],
+      "input": [{ "lane": "answers", "from": "gemini_1" }],
       "ui": {}
     }
   ],

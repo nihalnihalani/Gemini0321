@@ -153,10 +153,53 @@ export async function processJob(
     }
 
     checkCancelled(jobId);
+
+    // Quality review via RocketRide (non-blocking — uses revised script if quality fails)
+    try {
+      const { runQualityReviewPipeline } = await import("@/lib/rocketride");
+      await updateJobPersistent(jobId, { progress: 10, message: "Reviewing script quality..." });
+      const review = await runQualityReviewPipeline(script, (token: string) => {
+        updateJob(jobId, { rocketrideToken: token });
+      });
+      updateJob(jobId, { rocketrideToken: undefined });
+      console.log(`[QualityReview] Score: ${review.quality_score}/10, passed: ${review.passed}`);
+      if (!review.passed && review.revised_script) {
+        console.log(`[QualityReview] Using revised script (original score: ${review.quality_score})`);
+        script = review.revised_script;
+      }
+      if (review.suggestions.length > 0) {
+        console.log(`[QualityReview] Suggestions: ${review.suggestions.join("; ")}`);
+      }
+    } catch (qrError) {
+      updateJob(jobId, { rocketrideToken: undefined });
+      console.warn(`[QualityReview] Skipped: ${qrError instanceof Error ? qrError.message : qrError}`);
+    }
+
+    // Scene enhancement via RocketRide (non-blocking — enhances visual descriptions for Veo)
+    try {
+      const { runSceneEnhancerPipeline } = await import("@/lib/rocketride");
+      await updateJobPersistent(jobId, { progress: 12, message: "Enhancing scenes for video generation..." });
+      const enhanced = await runSceneEnhancerPipeline(script.scenes, (token: string) => {
+        updateJob(jobId, { rocketrideToken: token });
+      });
+      updateJob(jobId, { rocketrideToken: undefined });
+      // Merge enhanced prompts back into the script scenes
+      for (const ep of enhanced) {
+        const scene = script.scenes.find(s => s.scene_number === ep.scene_number);
+        if (scene && ep.enhanced_prompt) {
+          scene.visual_description = ep.enhanced_prompt;
+        }
+      }
+      console.log(`[SceneEnhancer] Enhanced ${enhanced.length} scenes for Veo`);
+    } catch (seError) {
+      updateJob(jobId, { rocketrideToken: undefined });
+      console.warn(`[SceneEnhancer] Skipped: ${seError instanceof Error ? seError.message : seError}`);
+    }
+
     await updateJobPersistent(jobId, {
       script,
       progress: 15,
-      message: "Script generated successfully",
+      message: "Script generated and optimized",
     });
 
     // Stage 2: Generate video clips + Nano Banan assets in parallel (15-55%)

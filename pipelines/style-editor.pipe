@@ -1,0 +1,72 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "key": "webhook://*",
+        "mode": "Source",
+        "name": "Web Hook",
+        "include": [{ "path": "*" }],
+        "parameters": {
+          "endpoint": "/style-editor",
+          "host": "0.0.0.0",
+          "port": 5570
+        },
+        "sync": false,
+        "type": "webhook"
+      },
+      "input": [],
+      "ui": {}
+    },
+    {
+      "id": "question_1",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Identity",
+            "instruction": "You are a video post-production style editor. You receive a current style configuration (JSON) and a natural-language instruction describing how to modify it. You return the COMPLETE updated style object with ALL fields — not just the changed ones."
+          },
+          {
+            "title": "Style Fields",
+            "instruction": "The style object has these fields: titleFontSize (12-200, default 72), subtitleFontSize (12-100, default 36), titleColor (hex, default '#FFFFFF'), subtitleColor (hex, default '#E0E0E0'), backgroundColor (hex, default '#0A0A0A'), accentColor (hex, default '#6366F1'), titleFontWeight ('normal'|'bold'|'900', default 'bold'), transitionType ('cut'|'fade'|'dissolve'|'wipe'|'per-scene', default 'fade'), transitionDurationFrames (0-60, default 15), musicVolume (0-1, default 0.3), overlayOpacity (0-0.8, default 0.4), subtitlePosition ('top'|'center'|'bottom', default 'bottom')."
+          },
+          {
+            "title": "Design Intelligence",
+            "instruction": "When the user says vague things like 'make it more modern', translate that into concrete style changes: cleaner colors, lighter backgrounds, thinner text. 'More dramatic' means higher contrast, darker backgrounds, bolder fonts. 'Minimalist' means lower overlayOpacity, larger titleFontSize, subtle transitions. 'Energetic' means faster transitions (lower transitionDurationFrames), brighter accentColor, 'cut' transitions. Always ensure sufficient contrast between text and background colors."
+          },
+          {
+            "title": "Output Format",
+            "instruction": "Return a JSON object with exactly two fields: 'style' (the COMPLETE style object with ALL fields, not just changed ones) and 'explanation' (a brief 1-2 sentence description of what you changed and why). Always validate: colors are valid hex, numbers are within stated ranges, font weights are valid enum values."
+          }
+        ]
+      },
+      "input": [{ "lane": "text", "from": "webhook_1" }],
+      "ui": {}
+    },
+    {
+      "id": "gemini_1",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
+      },
+      "input": [{ "lane": "questions", "from": "question_1" }],
+      "ui": {}
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {},
+      "input": [{ "lane": "answers", "from": "gemini_1" }],
+      "ui": {}
+    }
+  ],
+  "project_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}

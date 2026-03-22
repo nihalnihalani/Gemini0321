@@ -3,8 +3,8 @@ import { createRequire } from "module";
 const { RocketRideClient } = createRequire(import.meta.url)("rocketride") as { RocketRideClient: any };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RocketRideClient = any;
-import type { Script, TemplateId, SourceType, TemplateInput } from "./types";
-import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema } from "./schemas";
+import type { Script, TemplateId, SourceType, TemplateInput, CompositionStyle, Scene } from "./types";
+import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema, CompositionStyleSchema } from "./schemas";
 import { z } from "zod";
 import { readFileSync } from "fs";
 import path from "path";
@@ -351,6 +351,179 @@ Rules:
     }
 
     return extractResultData(result as Record<string, unknown>);
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+/**
+ * Run the style-editor pipeline to modify a video's composition style.
+ * Replaces direct Gemini calls in the /api/edit endpoint.
+ */
+export async function runStyleEditorPipeline(
+  instruction: string,
+  currentStyle: CompositionStyle,
+  onToken?: (token: string) => void
+): Promise<{ style: CompositionStyle; explanation: string }> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("style-editor.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start style-editor pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const input = `Current style configuration:\n${JSON.stringify(currentStyle, null, 2)}\n\nUser instruction: ${instruction}\n\nReturn a JSON object with "style" (the COMPLETE modified style object) and "explanation" (brief description of changes).`;
+
+    const result = await withTimeout(
+      rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
+      SEND_TIMEOUT_MS,
+      "Style editing"
+    );
+
+    if (!result) {
+      throw new Error("[RocketRide] Style editor pipeline returned no result");
+    }
+
+    const data = extractResultData(result as Record<string, unknown>) as Record<string, unknown>;
+    const style = CompositionStyleSchema.parse(data.style);
+    const explanation = typeof data.explanation === "string" ? data.explanation : "Style updated";
+
+    return { style, explanation };
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+/**
+ * Run the scene-enhancer pipeline to optimize visual descriptions for Veo.
+ * Takes raw scenes and returns enhanced prompts optimized for AI video generation.
+ */
+export async function runSceneEnhancerPipeline(
+  scenes: Scene[],
+  onToken?: (token: string) => void
+): Promise<{ scene_number: number; enhanced_prompt: string; negative_prompt: string; style_preset: string }[]> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("scene-enhancer.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start scene-enhancer pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const input = JSON.stringify({
+      scenes: scenes.map(s => ({
+        scene_number: s.scene_number,
+        visual_description: s.visual_description,
+        camera_direction: s.camera_direction,
+        mood: s.mood,
+        duration_seconds: s.duration_seconds,
+      })),
+    });
+
+    const result = await withTimeout(
+      rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
+      SEND_TIMEOUT_MS,
+      "Scene enhancement"
+    );
+
+    if (!result) {
+      throw new Error("[RocketRide] Scene enhancer pipeline returned no result");
+    }
+
+    const data = extractResultData(result as Record<string, unknown>) as Record<string, unknown>;
+    const enhanced = (data.enhanced_scenes ?? data) as { scene_number: number; enhanced_prompt: string; negative_prompt: string; style_preset: string }[];
+
+    if (!Array.isArray(enhanced)) {
+      throw new Error("[RocketRide] Scene enhancer returned non-array result");
+    }
+
+    return enhanced;
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+export interface QualityReviewResult {
+  passed: boolean;
+  quality_score: number;
+  scores: {
+    narrative: number;
+    visual_feasibility: number;
+    pacing: number;
+    consistency: number;
+    technical: number;
+  };
+  issues: string[];
+  suggestions: string[];
+  revised_script?: Script;
+}
+
+/**
+ * Run the quality-review pipeline to evaluate a script before video generation.
+ * Returns a quality assessment and optionally a revised script if it fails.
+ */
+export async function runQualityReviewPipeline(
+  script: Script,
+  onToken?: (token: string) => void
+): Promise<QualityReviewResult> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("quality-review.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start quality-review pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const input = `Review this video script for quality before it enters the video generation pipeline:\n\n${JSON.stringify(script, null, 2)}\n\nReturn JSON with: passed (boolean), quality_score (1-10), scores (narrative, visual_feasibility, pacing, consistency, technical), issues (array), suggestions (array), revised_script (only if passed is false).`;
+
+    const result = await withTimeout(
+      rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
+      SEND_TIMEOUT_MS,
+      "Quality review"
+    );
+
+    if (!result) {
+      throw new Error("[RocketRide] Quality review pipeline returned no result");
+    }
+
+    const data = extractResultData(result as Record<string, unknown>) as QualityReviewResult;
+
+    // If review failed and a revised script was provided, validate it
+    if (!data.passed && data.revised_script) {
+      try {
+        data.revised_script = ScriptSchema.parse(data.revised_script);
+      } catch {
+        // Revised script failed validation — remove it
+        delete data.revised_script;
+      }
+    }
+
+    return data;
   } finally {
     activePipelines--;
     await safeTerminate(rc, token);
