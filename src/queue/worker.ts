@@ -370,17 +370,14 @@ export async function processJob(
     };
 
     try {
-      const musicPath = await generateMusic(script.music_prompt, {
-        durationSeconds: script.total_duration_seconds,
-        mood: script.scenes[0]?.mood,
-      });
-      const musicKey = generateKey(jobId, "music.wav");
+      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
+      const musicKey = generateKey(jobId, "music.mp3");
       const musicUrl = await uploadFile(musicPath, musicKey);
       generatedScript.musicUrl = musicUrl;
-      console.log(`Music generated and uploaded: ${musicUrl}`);
+      console.log(`Music uploaded: ${musicUrl}`);
     } catch (err) {
       const musicError = err instanceof Error ? err.message : String(err);
-      console.error(`Music generation failed: ${musicError}`);
+      console.error(`Music upload failed: ${musicError}`);
       await updateJobPersistent(jobId, {
         message: `Music generation failed (video will have no background music): ${musicError}`,
       });
@@ -650,11 +647,11 @@ async function processTemplateJob(
     let sfxUrls = new Map<number, string>();
 
     const [musicResult, narrationResult, sfxResult] = await Promise.allSettled([
-      // Music generation
-      generateMusic(moodMap[templateId], {
-        durationSeconds: template.defaultDurationSeconds,
-        mood: moodMap[templateId],
-      }),
+      // Music: use local MP3 directly
+      uploadFile(
+        "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3",
+        generateKey(jobId, "music.mp3")
+      ),
       // Narration generation
       templateScenes.length > 0 ? generateAllNarrations(templateScenes) : Promise.resolve(new Map<number, string>()),
       // SFX generation
@@ -663,15 +660,10 @@ async function processTemplateJob(
 
     // Process music result
     if (musicResult.status === "fulfilled") {
-      try {
-        const musicKey = generateKey(jobId, "music.wav");
-        musicUrl = await uploadFile(musicResult.value, musicKey);
-        console.log(`Music generated and uploaded: ${musicUrl}`);
-      } catch (err) {
-        console.error(`Music upload failed: ${err instanceof Error ? err.message : err}`);
-      }
+      musicUrl = musicResult.value;
+      console.log(`Music uploaded: ${musicUrl}`);
     } else {
-      console.error(`Music generation failed: ${musicResult.reason instanceof Error ? musicResult.reason.message : musicResult.reason}`);
+      console.error(`Music upload failed: ${musicResult.reason instanceof Error ? musicResult.reason.message : musicResult.reason}`);
     }
 
     // Process narration result

@@ -137,10 +137,10 @@ async function processAndSendVideo(
     if (status.stage !== lastStage) {
       lastStage = status.stage;
       const stageLabel: Record<string, string> = {
-        generating_script: "Writing script...",
-        generating_clips: "Generating video clips...",
-        uploading_assets: "Uploading assets...",
-        composing_video: "Composing final video...",
+        generating_script: "✍️ Analyzing content and writing script...",
+        generating_clips: "🎥 Generating video clips...",
+        uploading_assets: "☁️ Uploading assets...",
+        composing_video: "🎞️ Composing final video...",
       };
       if (stageLabel[status.stage]) {
         await sendMessage(chatId, stageLabel[status.stage]);
