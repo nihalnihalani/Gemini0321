@@ -8,7 +8,11 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [{ "path": "*" }],
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
         "parameters": {
           "endpoint": "/style-editor",
           "host": "0.0.0.0",
@@ -18,7 +22,16 @@
         "type": "webhook"
       },
       "input": [],
-      "ui": {}
+      "ui": {
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_1",
@@ -45,8 +58,22 @@
           }
         ]
       },
-      "input": [{ "lane": "text", "from": "webhook_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 380,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_1",
@@ -57,15 +84,43 @@
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
-      "input": [{ "lane": "questions", "from": "question_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 660,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [{ "lane": "answers", "from": "gemini_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 940,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     }
   ],
   "project_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"

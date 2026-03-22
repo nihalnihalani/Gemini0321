@@ -8,13 +8,30 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [{ "path": "*" }],
-        "parameters": { "endpoint": "/video-master", "host": "0.0.0.0", "port": 5573 },
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
+        "parameters": {
+          "endpoint": "/video-master",
+          "host": "0.0.0.0",
+          "port": 5573
+        },
         "sync": false,
         "type": "webhook"
       },
       "input": [],
-      "ui": {}
+      "ui": {
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_script",
@@ -49,18 +66,48 @@
           }
         ]
       },
-      "input": [{ "lane": "text", "from": "webhook_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 380,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_script",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_script" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_script"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 660,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_review",
@@ -87,18 +134,48 @@
           }
         ]
       },
-      "input": [{ "lane": "answers", "from": "gemini_script" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_script"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 940,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_review",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_review" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_review"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1220,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_merge",
@@ -117,18 +194,48 @@
           }
         ]
       },
-      "input": [{ "lane": "answers", "from": "gemini_review" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_review"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1500,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_merge",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_merge" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_merge"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1780,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_enhance",
@@ -151,25 +258,69 @@
           }
         ]
       },
-      "input": [{ "lane": "answers", "from": "gemini_merge" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_merge"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 2060,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_enhance",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_enhance" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_enhance"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 2340,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [{ "lane": "answers", "from": "gemini_enhance" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_enhance"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 2620,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     }
   ],
   "project_id": "d4e5f6a7-b8c9-0123-def0-456789abcdef"

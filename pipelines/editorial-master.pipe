@@ -8,13 +8,30 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [{ "path": "*" }],
-        "parameters": { "endpoint": "/editorial-master", "host": "0.0.0.0", "port": 5574 },
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
+        "parameters": {
+          "endpoint": "/editorial-master",
+          "host": "0.0.0.0",
+          "port": 5574
+        },
         "sync": false,
         "type": "webhook"
       },
       "input": [],
-      "ui": {}
+      "ui": {
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_analyze",
@@ -37,18 +54,48 @@
           }
         ]
       },
-      "input": [{ "lane": "text", "from": "webhook_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 380,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_analyze",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_analyze" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_analyze"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 660,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_plan",
@@ -75,18 +122,48 @@
           }
         ]
       },
-      "input": [{ "lane": "answers", "from": "gemini_analyze" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_analyze"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 940,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_plan",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_plan" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_plan"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1220,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_refine",
@@ -109,25 +186,69 @@
           }
         ]
       },
-      "input": [{ "lane": "answers", "from": "gemini_plan" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_plan"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1500,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_refine",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_refine" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_refine"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 1780,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [{ "lane": "answers", "from": "gemini_refine" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_refine"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 2060,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     }
   ],
   "project_id": "e5f6a7b8-c9d0-1234-ef01-56789abcdef0"

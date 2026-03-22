@@ -8,13 +8,30 @@
         "key": "webhook://*",
         "mode": "Source",
         "name": "Web Hook",
-        "include": [{ "path": "*" }],
-        "parameters": { "endpoint": "/github-analysis", "host": "0.0.0.0", "port": 5575 },
+        "include": [
+          {
+            "path": "*"
+          }
+        ],
+        "parameters": {
+          "endpoint": "/github-analysis",
+          "host": "0.0.0.0",
+          "port": 5575
+        },
         "sync": false,
         "type": "webhook"
       },
       "input": [],
-      "ui": {}
+      "ui": {
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "question_analyze",
@@ -37,25 +54,69 @@
           }
         ]
       },
-      "input": [{ "lane": "text", "from": "webhook_1" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "text",
+          "from": "webhook_1"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 380,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "gemini_analyze",
       "provider": "llm_gemini",
       "config": {
         "profile": "gemini-2_5-flash",
-        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+        "gemini-2_5-flash": {
+          "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
+        }
       },
-      "input": [{ "lane": "questions", "from": "question_analyze" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "questions",
+          "from": "question_analyze"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 660,
+          "y": 100
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     },
     {
       "id": "response_1",
       "provider": "response",
       "config": {},
-      "input": [{ "lane": "answers", "from": "gemini_analyze" }],
-      "ui": {}
+      "input": [
+        {
+          "lane": "answers",
+          "from": "gemini_analyze"
+        }
+      ],
+      "ui": {
+        "position": {
+          "x": 940,
+          "y": 180
+        },
+        "measured": {
+          "width": 220,
+          "height": 60
+        }
+      }
     }
   ],
   "project_id": "f6a7b8c9-d0e1-2345-f012-6789abcdef01"
