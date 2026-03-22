@@ -10,12 +10,11 @@ import { BackgroundMusic } from "../shared";
 
 const FPS = 30;
 
-// Fast-paced scene durations
-const HOOK_DURATION = 2 * FPS;          // 2s — grab attention
-const PRODUCT_FLASH_DURATION = 3 * FPS; // 3s — show the product
-const FEATURE_BURST_DURATION = 6 * FPS; // 6s — rapid features
-const CTA_DURATION = 3 * FPS;           // 3s — call to action
-// Total: ~14s default
+// Scene durations in frames
+const HOOK_DURATION = 2 * FPS;           // 2s - attention grab
+const PRODUCT_FLASH_DURATION = 3 * FPS;  // 3s - product showcase
+const FEATURE_FRAMES_EACH = 30;          // ~1s per feature
+const CTA_DURATION = 3 * FPS;            // 3s - call to action
 
 export const SocialPromo: React.FC<z.infer<typeof SocialPromoSchema>> = ({
   hook,
@@ -24,36 +23,35 @@ export const SocialPromo: React.FC<z.infer<typeof SocialPromoSchema>> = ({
   cta,
   musicUrl,
 }) => {
+  const featureBurstDuration = features.length * FEATURE_FRAMES_EACH;
+
   return (
-    <AbsoluteFill style={{ backgroundColor: "#0a0a0f" }}>
+    <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
       <Series>
-        {/* Hook: bold attention grabber */}
+        {/* Hook: bold, attention-grabbing text */}
         <Series.Sequence durationInFrames={HOOK_DURATION}>
           <HookScene hook={hook} />
         </Series.Sequence>
 
-        {/* Product flash with first feature */}
+        {/* Product Flash: image with feature badges */}
         <Series.Sequence durationInFrames={PRODUCT_FLASH_DURATION}>
-          <ProductFlash
-            productImage={productImage}
-            featureText={features[0]}
-          />
+          <ProductFlash productImage={productImage} features={features} />
         </Series.Sequence>
 
-        {/* Rapid feature burst */}
-        <Series.Sequence durationInFrames={FEATURE_BURST_DURATION}>
+        {/* Feature Burst: rapid-fire feature highlights */}
+        <Series.Sequence durationInFrames={featureBurstDuration}>
           <FeatureBurst features={features} />
         </Series.Sequence>
 
-        {/* CTA */}
+        {/* CTA: call to action with pulsing glow */}
         <Series.Sequence durationInFrames={CTA_DURATION}>
           <CTAScene cta={cta} />
         </Series.Sequence>
       </Series>
 
-      {/* Background music */}
+      {/* Background music across entire composition */}
       {musicUrl && (
-        <BackgroundMusic src={musicUrl} volume={0.3} fadeInFrames={10} fadeOutFrames={20} />
+        <BackgroundMusic src={musicUrl} volume={0.3} fadeInFrames={15} fadeOutFrames={30} />
       )}
     </AbsoluteFill>
   );
