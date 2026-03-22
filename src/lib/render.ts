@@ -5,6 +5,20 @@ import type { GeneratedScript, CompositionStyle, TemplateId, TemplateInput } fro
 import { DEFAULT_STYLE } from "./types";
 import { getTemplate } from "./templates";
 
+// Cache the bundle URL to avoid re-bundling on every render
+let cachedBundleUrl: string | null = null;
+
+async function getBundle(): Promise<string> {
+  if (cachedBundleUrl) {
+    return cachedBundleUrl;
+  }
+  cachedBundleUrl = await bundle({
+    entryPoint: path.resolve(process.cwd(), "src/remotion/Root.tsx"),
+    webpackOverride: (config) => config,
+  });
+  return cachedBundleUrl;
+}
+
 /**
  * @deprecated Use renderTemplateVideo() for template-based rendering.
  */
@@ -13,10 +27,7 @@ export async function renderVideo(
   style: CompositionStyle = DEFAULT_STYLE,
   outputPath: string
 ): Promise<string> {
-  const bundled = await bundle({
-    entryPoint: path.resolve(process.cwd(), "src/remotion/Root.tsx"),
-    webpackOverride: (config) => config,
-  });
+  const bundled = await getBundle();
 
   const composition = await selectComposition({
     serveUrl: bundled,
@@ -51,10 +62,7 @@ export async function renderTemplateVideo(
   const effectiveWidth = socialInput.aspectRatio === "9:16" ? 1080 : width;
   const effectiveHeight = socialInput.aspectRatio === "9:16" ? 1920 : height;
 
-  const bundled = await bundle({
-    entryPoint: path.resolve(process.cwd(), "src/remotion/Root.tsx"),
-    webpackOverride: (config) => config,
-  });
+  const bundled = await getBundle();
 
   const props = inputProps as unknown as Record<string, unknown>;
 

@@ -112,7 +112,12 @@ const RemotionRoot: React.FC = () => {
           features: ["Feature 1", "Feature 2"],
           brandColor: "#1a1a2e",
         }}
-        durationInFrames={35 * FPS}
+        calculateMetadata={({ props }) => {
+          // Intro(4s) + Features(8s) + Showcase(6s * min(images,2)) + Reveal(5s)
+          const showcaseCount = Math.min(props.productImages.length, 2);
+          const totalSeconds = 4 + 8 + showcaseCount * 6 + 5;
+          return { durationInFrames: totalSeconds * FPS };
+        }}
       />
 
       {/* Explainer template */}
@@ -131,7 +136,11 @@ const RemotionRoot: React.FC = () => {
           ],
           conclusion: "Now you understand!",
         }}
-        durationInFrames={50 * FPS}
+        calculateMetadata={({ props }) => {
+          // Intro(4s) + Steps(8s each) + Summary(6s)
+          const totalSeconds = 4 + props.steps.length * 8 + 6;
+          return { durationInFrames: totalSeconds * FPS };
+        }}
       />
 
       {/* Social Media Promo template */}
@@ -149,7 +158,11 @@ const RemotionRoot: React.FC = () => {
           cta: "Try Now",
           aspectRatio: "16:9" as const,
         }}
-        durationInFrames={20 * FPS}
+        calculateMetadata={({ props }) => {
+          // Hook(2s) + ProductFlash(3s) + FeatureBurst(1s * features) + CTA(3s)
+          const totalSeconds = 2 + 3 + props.features.length + 3;
+          return { durationInFrames: totalSeconds * FPS };
+        }}
       />
 
       {/* Brand Story template */}
@@ -170,7 +183,12 @@ const RemotionRoot: React.FC = () => {
           ],
           vision: "Our vision for the future",
         }}
-        durationInFrames={50 * FPS}
+        calculateMetadata={({ props }) => {
+          // Opening(5s) + Milestones(max(4s, milestones*2s)) + Team(4s) + Vision(5s)
+          const milestoneDuration = Math.max(4, props.milestones.length * 2);
+          const totalSeconds = 5 + milestoneDuration + 4 + 5;
+          return { durationInFrames: totalSeconds * FPS };
+        }}
       />
     </>
   );

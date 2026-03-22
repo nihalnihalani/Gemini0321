@@ -1,5 +1,4 @@
-import { generateScript } from "@/lib/gemini";
-import { generateTemplateContent } from "@/lib/gemini";
+import { generateScript, generateTemplateContent } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";

@@ -41,25 +41,27 @@ export const ProductFlash: React.FC<ProductFlashProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
       {/* Product image with glow border */}
-      <AbsoluteFill
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          opacity: fadeIn,
-        }}
-      >
-        <Img
-          src={productImage}
+      {productImage && (
+        <AbsoluteFill
           style={{
-            maxWidth: "55%",
-            maxHeight: "55%",
-            objectFit: "contain",
-            transform: `scale(${zoomScale})`,
-            borderRadius: 12,
-            boxShadow: `0 0 ${30 * glowPulse}px rgba(156, 202, 255, ${0.4 * glowPulse}), 0 0 ${60 * glowPulse}px rgba(92, 31, 222, ${0.2 * glowPulse})`,
+            justifyContent: "center",
+            alignItems: "center",
+            opacity: fadeIn,
           }}
-        />
-      </AbsoluteFill>
+        >
+          <Img
+            src={productImage}
+            style={{
+              maxWidth: "55%",
+              maxHeight: "55%",
+              objectFit: "contain",
+              transform: `scale(${zoomScale})`,
+              borderRadius: 12,
+              boxShadow: `0 0 ${30 * glowPulse}px rgba(156, 202, 255, ${0.4 * glowPulse}), 0 0 ${60 * glowPulse}px rgba(92, 31, 222, ${0.2 * glowPulse})`,
+            }}
+          />
+        </AbsoluteFill>
+      )}
 
       {/* Feature badges around the image */}
       {features.slice(0, 4).map((feature, index) => {

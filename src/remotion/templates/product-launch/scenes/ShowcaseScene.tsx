@@ -39,24 +39,26 @@ export const ShowcaseScene: React.FC<ShowcaseSceneProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: "#faf8f5" }}>
       {/* Product image with zoom */}
-      <AbsoluteFill
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          opacity: fadeIn,
-        }}
-      >
-        <Img
-          src={productImage}
+      {productImage && (
+        <AbsoluteFill
           style={{
-            maxWidth: "70%",
-            maxHeight: "70%",
-            objectFit: "contain",
-            transform: `scale(${zoomScale})`,
-            borderRadius: 12,
+            justifyContent: "center",
+            alignItems: "center",
+            opacity: fadeIn,
           }}
-        />
-      </AbsoluteFill>
+        >
+          <Img
+            src={productImage}
+            style={{
+              maxWidth: "70%",
+              maxHeight: "70%",
+              objectFit: "contain",
+              transform: `scale(${zoomScale})`,
+              borderRadius: 12,
+            }}
+          />
+        </AbsoluteFill>
+      )}
 
       {/* Large decorative text overlay */}
       <AbsoluteFill

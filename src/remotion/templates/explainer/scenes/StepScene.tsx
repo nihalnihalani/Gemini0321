@@ -91,7 +91,6 @@ export const StepScene: React.FC<StepSceneProps> = ({
             width: `${progressWidth}%`,
             height: "100%",
             background: "linear-gradient(90deg, #6366f1, #a855f7)",
-            transition: "width 0.3s",
           }}
         />
       </div>
