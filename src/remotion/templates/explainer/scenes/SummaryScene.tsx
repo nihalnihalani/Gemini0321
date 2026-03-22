@@ -16,6 +16,17 @@ interface SummarySceneProps {
   summaryNarration?: string;
 }
 
+/**
+ * SummaryScene — Closing scene that recaps key takeaways.
+ *
+ * Design principles applied:
+ * - Full progress bar signals completion (leverages Zeigarnik completion satisfaction)
+ * - Animated checkmarks with SVG stroke-dashoffset for a satisfying "drawn" reveal
+ * - Staggered item reveal builds recall by reviewing each concept
+ * - Completion celebration: expanding ring burst + confetti particles
+ * - Green accent color signals success/completion (color psychology)
+ * - Conclusion text enters last — the final mental anchor
+ */
 export const SummaryScene: React.FC<SummarySceneProps> = ({
   conclusion,
   stepTitles,
@@ -26,18 +37,18 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
 
   // Scene fade-in
-  const sceneOpacity = interpolate(frame, [0, 12], [0, 1], {
+  const sceneOpacity = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
   });
 
   // Scene fade-out
-  const fadeOutStart = durationInFrames - 20;
+  const fadeOutStart = durationInFrames - 22;
   const sceneExit = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // "Key Takeaways" header
+  // "Key Takeaways" header — spring entrance
   const headerProgress = spring({
     frame,
     fps,
@@ -45,27 +56,89 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
   });
   const headerTranslateY = interpolate(headerProgress, [0, 1], [30, 0]);
   const headerOpacity = interpolate(headerProgress, [0, 1], [0, 1]);
+  const headerScale = interpolate(headerProgress, [0, 1], [0.94, 1]);
 
-  // Takeaway items stagger
-  const itemStagger = 15;
-
-  // Conclusion text fades in after items
-  const conclusionDelay = 20 + stepTitles.length * itemStagger;
-  const conclusionFrame = Math.max(0, frame - conclusionDelay);
-  const conclusionOpacity = interpolate(conclusionFrame, [0, 25], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  const conclusionTranslateY = interpolate(conclusionFrame, [0, 25], [15, 0], {
-    extrapolateRight: "clamp",
-  });
-
-  // Decorative line
-  const lineDelay = 10;
+  // Decorative line under header
+  const lineDelay = 12;
   const lineFrame = Math.max(0, frame - lineDelay);
-  const lineWidth = interpolate(lineFrame, [0, 25], [0, 80], {
+  const lineWidth = interpolate(lineFrame, [0, 25], [0, 90], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const lineOpacity = interpolate(lineFrame, [0, 12], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  // Takeaway items stagger — generous spacing for comprehension
+  const itemStagger = 18;
+
+  // Conclusion text — enters after all items have appeared
+  const conclusionDelay = 24 + stepTitles.length * itemStagger;
+  const conclusionFrame = Math.max(0, frame - conclusionDelay);
+  const conclusionProgress = spring({
+    frame: conclusionFrame,
+    fps,
+    config: { damping: 16, stiffness: 70 },
+  });
+  const conclusionOpacity = interpolate(conclusionProgress, [0, 1], [0, 1]);
+  const conclusionTranslateY = interpolate(conclusionProgress, [0, 1], [18, 0]);
+
+  // Celebration ring burst — triggers after all items are revealed
+  const celebrationDelay = 18 + stepTitles.length * itemStagger;
+  const celebrationFrame = Math.max(0, frame - celebrationDelay);
+  const ringScale = spring({
+    frame: celebrationFrame,
+    fps,
+    config: { damping: 6, stiffness: 40 },
+  });
+  const ringOpacity = interpolate(ringScale, [0, 0.3, 1], [0, 0.25, 0]);
+
+  // Celebration particles
+  const particleCount = 12;
+  const celebrationParticles = Array.from({ length: particleCount }, (_, i) => {
+    const angle = (i / particleCount) * Math.PI * 2;
+    const distance = ringScale * 180 + 40;
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    const particleOpacity = interpolate(
+      ringScale,
+      [0, 0.2, 0.7, 1],
+      [0, 0.6, 0.3, 0]
+    );
+    const size = 4 + (i % 3) * 2;
+    const colors = ["#4ade80", "#22c55e", "#818cf8", "#a78bfa", "#fbbf24"];
+    const color = colors[i % colors.length];
+
+    return (
+      <div
+        key={i}
+        style={{
+          position: "absolute",
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          backgroundColor: color,
+          opacity: particleOpacity,
+          transform: `translate(${x}px, ${y}px)`,
+          left: "50%",
+          top: "40%",
+        }}
+      />
+    );
+  });
+
+  // Subtle background grid
+  const gridOpacity = interpolate(frame, [0, 20], [0, 0.025], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Success glow behind header
+  const glowOpacity = interpolate(
+    Math.sin(frame * 0.025),
+    [-1, 1],
+    [0.04, 0.08]
+  );
 
   return (
     <AbsoluteFill
@@ -74,7 +147,52 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
         opacity: sceneOpacity * sceneExit,
       }}
     >
-      {/* Completed progress bar */}
+      {/* Background grid */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: gridOpacity,
+          backgroundImage:
+            "radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      {/* Success glow */}
+      <div
+        style={{
+          position: "absolute",
+          top: "20%",
+          left: "50%",
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, #22c55e, transparent 70%)",
+          opacity: glowOpacity,
+          transform: "translateX(-50%) translateY(-50%)",
+        }}
+      />
+
+      {/* Celebration ring burst */}
+      <div
+        style={{
+          position: "absolute",
+          top: "40%",
+          left: "50%",
+          width: ringScale * 400,
+          height: ringScale * 400,
+          borderRadius: "50%",
+          border: "2px solid rgba(74, 222, 128, 0.3)",
+          opacity: ringOpacity,
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+
+      {/* Celebration particles */}
+      {celebrationParticles}
+
+      {/* Completed progress bar — full width with glow */}
       <div
         style={{
           position: "absolute",
@@ -82,7 +200,8 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
           left: 0,
           right: 0,
           height: 4,
-          background: "linear-gradient(90deg, #6366f1, #a855f7, #ec4899)",
+          background: "linear-gradient(90deg, #6366f1, #a855f7, #22c55e)",
+          boxShadow: "0 0 12px rgba(34, 197, 94, 0.3)",
         }}
       />
 
@@ -98,35 +217,37 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 28,
+            gap: 24,
             maxWidth: "80%",
           }}
         >
-          {/* Header */}
+          {/* "Summary" label */}
           <div
             style={{
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: 600,
-              color: "#22c55e",
+              color: "#4ade80",
               fontFamily: "'Inter', system-ui, sans-serif",
-              letterSpacing: "0.15em",
+              letterSpacing: "0.16em",
               textTransform: "uppercase",
               opacity: headerOpacity,
-              transform: `translateY(${headerTranslateY}px)`,
+              transform: `translateY(${headerTranslateY}px) scale(${headerScale})`,
             }}
           >
             Summary
           </div>
 
+          {/* "Key Takeaways" heading */}
           <div
             style={{
-              fontSize: 44,
+              fontSize: 46,
               fontWeight: 800,
               color: "#ffffff",
               fontFamily: "'Inter', system-ui, sans-serif",
               opacity: headerOpacity,
-              transform: `translateY(${headerTranslateY}px)`,
+              transform: `translateY(${headerTranslateY}px) scale(${headerScale})`,
               letterSpacing: "-0.02em",
+              textShadow: "0 2px 20px rgba(34, 197, 94, 0.15)",
             }}
           >
             Key Takeaways
@@ -137,8 +258,9 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
             style={{
               width: lineWidth,
               height: 3,
-              background: "linear-gradient(90deg, transparent, #22c55e, transparent)",
+              background: "linear-gradient(90deg, transparent, #4ade80, transparent)",
               borderRadius: 2,
+              opacity: lineOpacity,
             }}
           />
 
@@ -147,21 +269,36 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 16,
+              gap: 14,
               width: "100%",
-              marginTop: 8,
+              marginTop: 6,
             }}
           >
             {stepTitles.map((stepTitle, index) => {
-              const delay = 15 + index * itemStagger;
+              const delay = 16 + index * itemStagger;
               const localFrame = Math.max(0, frame - delay);
               const progress = spring({
                 frame: localFrame,
                 fps,
                 config: { damping: 14, stiffness: 80 },
               });
-              const translateX = interpolate(progress, [0, 1], [40, 0]);
+              const translateX = interpolate(progress, [0, 1], [30, 0]);
               const opacity = interpolate(progress, [0, 1], [0, 1]);
+
+              // Checkmark draw animation (SVG stroke-dashoffset)
+              const checkDelay = delay + 8;
+              const checkFrame = Math.max(0, frame - checkDelay);
+              const checkProgress = interpolate(checkFrame, [0, 12], [0, 1], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              });
+
+              // Circle fill behind checkmark
+              const circleScale = spring({
+                frame: Math.max(0, frame - delay - 2),
+                fps,
+                config: { damping: 12, stiffness: 100 },
+              });
 
               return (
                 <div
@@ -169,45 +306,55 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 16,
+                    gap: 18,
                     transform: `translateX(${translateX}px)`,
                     opacity,
-                    padding: "10px 16px",
-                    borderRadius: 10,
+                    padding: "12px 20px",
+                    borderRadius: 12,
                     backgroundColor: "rgba(255, 255, 255, 0.04)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                   }}
                 >
-                  {/* Checkmark */}
+                  {/* Animated checkmark circle */}
                   <div
                     style={{
-                      width: 28,
-                      height: 28,
+                      width: 30,
+                      height: 30,
                       borderRadius: "50%",
                       background: "linear-gradient(135deg, #22c55e, #16a34a)",
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
                       flexShrink: 0,
-                      boxShadow: "0 2px 8px rgba(34, 197, 94, 0.25)",
+                      boxShadow: "0 3px 10px rgba(34, 197, 94, 0.3)",
+                      transform: `scale(${circleScale})`,
                     }}
                   >
-                    <span
-                      style={{
-                        color: "#ffffff",
-                        fontSize: 15,
-                        fontWeight: 700,
-                      }}
+                    {/* SVG checkmark with stroke animation */}
+                    <svg
+                      width="16"
+                      height="12"
+                      viewBox="0 0 16 12"
+                      fill="none"
                     >
-                      ✓
-                    </span>
+                      <path
+                        d="M2 6L6 10L14 2"
+                        stroke="#ffffff"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeDasharray="20"
+                        strokeDashoffset={20 * (1 - checkProgress)}
+                      />
+                    </svg>
                   </div>
 
+                  {/* Step title text */}
                   <div
                     style={{
-                      fontSize: 26,
+                      fontSize: 25,
                       fontWeight: 600,
-                      color: "rgba(255, 255, 255, 0.9)",
+                      color: "rgba(255, 255, 255, 0.92)",
                       fontFamily: "'Inter', system-ui, sans-serif",
                       letterSpacing: "-0.01em",
                     }}
@@ -219,19 +366,20 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
             })}
           </div>
 
-          {/* Conclusion */}
+          {/* Conclusion text */}
           <div
             style={{
               fontSize: 22,
               fontWeight: 400,
-              color: "rgba(255, 255, 255, 0.6)",
+              color: "rgba(255, 255, 255, 0.65)",
               fontFamily: "'Inter', system-ui, sans-serif",
               textAlign: "center",
-              lineHeight: 1.6,
+              lineHeight: 1.65,
               opacity: conclusionOpacity,
               transform: `translateY(${conclusionTranslateY}px)`,
-              marginTop: 8,
+              marginTop: 10,
               maxWidth: "90%",
+              letterSpacing: "0.01em",
             }}
           >
             {conclusion}
@@ -242,7 +390,7 @@ export const SummaryScene: React.FC<SummarySceneProps> = ({
       {/* Narration audio */}
       {narrationUrl && <Audio src={narrationUrl} volume={1} />}
 
-      {/* Captions for summary narration — only when narration audio exists */}
+      {/* Captions for summary narration */}
       {summaryNarration && narrationUrl && (
         <NarrationCaptions
           text={summaryNarration}

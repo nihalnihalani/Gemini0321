@@ -1,11 +1,14 @@
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import path from "path";
+import os from "os";
 import type { GeneratedScript, CompositionStyle, TemplateId, TemplateInput } from "./types";
 import { DEFAULT_STYLE } from "./types";
 import { getTemplate } from "./templates";
 
-// Cache the bundle URL to avoid re-bundling on every render
+// Cache the bundle URL to avoid re-bundling on every render.
+// Bundle caching is a critical performance optimization — bundling is expensive
+// and the output only changes when source code changes.
 let cachedBundleUrl: string | null = null;
 
 async function getBundle(): Promise<string> {
@@ -17,6 +20,47 @@ async function getBundle(): Promise<string> {
     webpackOverride: (config) => config,
   });
   return cachedBundleUrl;
+}
+
+/**
+ * Compute optimal concurrency based on available CPU cores.
+ *
+ * Remotion best practice: use `npx remotion benchmark` to find the sweet spot.
+ * As a general heuristic, half of available CPU threads is a safe default that
+ * balances render speed with system responsiveness. We cap at 8 to avoid
+ * excessive memory usage on high-core-count machines.
+ */
+function getOptimalConcurrency(): number {
+  const cpuCount = os.cpus().length;
+  // Use half of available threads, minimum 1, maximum 8
+  return Math.max(1, Math.min(8, Math.floor(cpuCount / 2)));
+}
+
+/**
+ * Shared renderMedia options for consistent, optimized output.
+ *
+ * Best practices applied:
+ * - codec: "h264" — fastest encoding, universal browser/player support
+ * - crf: 18 — high quality with reasonable file size (Remotion default is 18 for H.264)
+ * - imageFormat: "jpeg" — faster than PNG, suitable when alpha channel is not needed
+ * - jpegQuality: 90 — high quality frames with minimal compression artifacts
+ * - pixelFormat: "yuv420p" — maximum compatibility across players and browsers
+ * - concurrency: auto-tuned based on CPU cores
+ * - x264Preset: "medium" — balanced encoding speed vs compression efficiency
+ *   (use "fast" or "veryfast" for development, "slow" for final delivery)
+ */
+function getSharedRenderOptions() {
+  return {
+    codec: "h264" as const,
+    crf: 18,
+    imageFormat: "jpeg" as const,
+    jpegQuality: 90,
+    pixelFormat: "yuv420p" as const,
+    concurrency: getOptimalConcurrency(),
+    x264Preset: "medium" as const,
+    // Timeout: 60s per frame to handle slow Veo clip loading
+    timeoutInMilliseconds: 60000,
+  };
 }
 
 /**
@@ -38,9 +82,9 @@ export async function renderVideo(
   await renderMedia({
     composition,
     serveUrl: bundled,
-    codec: "h264",
     outputLocation: outputPath,
     inputProps: { script, compositionStyle: style },
+    ...getSharedRenderOptions(),
   });
 
   return outputPath;
@@ -82,9 +126,9 @@ export async function renderTemplateVideo(
   await renderMedia({
     composition: finalComposition,
     serveUrl: bundled,
-    codec: "h264",
     outputLocation: outputPath,
     inputProps: props,
+    ...getSharedRenderOptions(),
   });
 
   return outputPath;
