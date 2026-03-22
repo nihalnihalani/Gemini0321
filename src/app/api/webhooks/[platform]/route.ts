@@ -1,4 +1,4 @@
-import { after } from "next/server";
+import { handleTelegramUpdate } from "@/lib/bot";
 
 export async function POST(
   request: Request,
@@ -6,22 +6,20 @@ export async function POST(
 ) {
   const { platform } = await params;
 
+  if (platform !== "telegram") {
+    return new Response(`Unknown platform: ${platform}`, { status: 404 });
+  }
+
   if (!process.env.TELEGRAM_BOT_TOKEN) {
     return new Response("Bot not configured", { status: 503 });
   }
 
-  const { getBot, registerBotHandlers } = await import("@/lib/bot");
-  await registerBotHandlers();
-  const bot = await getBot();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handler = (bot as any).webhooks?.[platform];
-
-  if (!handler) {
-    return new Response(`Unknown platform adapter: ${platform}`, { status: 404 });
+  try {
+    const update = await request.json();
+    await handleTelegramUpdate(update);
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  } catch (error) {
+    console.error("Telegram webhook error:", error);
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
-
-  return handler(request, {
-    waitUntil: (task: Promise<unknown>) => after(() => task),
-  });
 }
