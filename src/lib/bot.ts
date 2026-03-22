@@ -27,37 +27,52 @@ const pendingInputs: Map<number, PendingInput> =
 // -- Telegram API helpers --
 
 async function sendMessage(chatId: number, text: string, extra?: Record<string, unknown>) {
-  await fetch(`${API_BASE}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
-  });
+  try {
+    await fetch(`${API_BASE}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    console.warn("sendMessage failed:", err);
+  }
 }
 
 async function sendVideo(chatId: number, videoUrl: string, caption?: string) {
-  const res = await fetch(`${API_BASE}/sendVideo`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      video: videoUrl,
-      caption,
-      supports_streaming: true,
-    }),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/sendVideo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        video: videoUrl,
+        caption,
+        supports_streaming: true,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn("sendVideo failed:", err);
+    }
+  } catch (err) {
     console.warn("sendVideo failed:", err);
   }
 }
 
 async function answerCallbackQuery(callbackQueryId: string, text?: string) {
-  await fetch(`${API_BASE}/answerCallbackQuery`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
-  });
+  try {
+    await fetch(`${API_BASE}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    console.warn("answerCallbackQuery failed:", err);
+  }
 }
 
 // -- Input type detection --
@@ -208,6 +223,7 @@ export async function handleTelegramUpdate(update: Record<string, unknown>) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_id: photo.file_id }),
+      signal: AbortSignal.timeout(15_000),
     });
     const fileData = await fileRes.json() as { result?: { file_path?: string } };
     const filePath = fileData.result?.file_path;
