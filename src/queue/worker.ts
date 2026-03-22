@@ -550,6 +550,10 @@ async function processTemplateJob(
       const introNarration = (ex.introNarration as string) || `Let's explore ${ex.title}. Here's what you need to know.`;
       const summaryNarration = (ex.summaryNarration as string) || String(ex.conclusion || "And that's a wrap.");
 
+      // Write narration text back so it reaches the Explainer component for captions
+      enrichedContent.introNarration = introNarration;
+      enrichedContent.summaryNarration = summaryNarration;
+
       // Scene 0: Intro narration — hook the viewer
       templateScenes.push({
         scene_number: 0,

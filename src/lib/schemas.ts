@@ -73,8 +73,8 @@ export const ExplainerInputSchema = z.object({
   conclusion: z.string().describe("Summary or conclusion text"),
   introNarration: z.string().optional().describe("A 2-3 sentence spoken introduction that hooks the viewer and sets up the topic. Conversational, engaging, like a great teacher. Example: 'Have you ever wondered how your phone knows what you're saying? Today, we're going to break down speech recognition in 4 simple steps.'"),
   summaryNarration: z.string().optional().describe("A 2-3 sentence spoken conclusion that wraps up the learning memorably. Example: 'And there you have it — from sound waves to text on your screen. Speech recognition isn't magic, it's just math, data, and a lot of practice.'"),
-  narrationUrls: z.record(z.string()).optional().describe("Map of scene number to narration audio URL"),
-  sfxUrls: z.record(z.string()).optional().describe("Map of scene number to sound effect URL"),
+  narrationUrls: z.record(z.string(), z.string()).optional().describe("Map of scene number to narration audio URL"),
+  sfxUrls: z.record(z.string(), z.string()).optional().describe("Map of scene number to sound effect URL"),
   musicUrl: z.string().optional().describe("Background music URL"),
 });
 
