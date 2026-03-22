@@ -324,10 +324,10 @@ export default function GenerationProgress({
             </div>
           )}
 
-          {status.downloadUrl && (
+          {(status.downloadUrl || status.previewUrl) && (
             <div className="flex justify-center">
               <a
-                href={status.downloadUrl}
+                href={status.downloadUrl || status.previewUrl}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#5c1fde] px-8 py-3 text-sm font-semibold text-[#e4e1e9] transition-all hover:bg-[#7640f0] hover:shadow-[0_0_24px_rgba(92,31,222,0.4)]"
               >
                 <svg
