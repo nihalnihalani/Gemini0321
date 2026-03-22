@@ -147,19 +147,24 @@ The following tests require API keys and running services:
 
 ---
 
-## Known Issues (from Devils Advocate Review)
+## Critical Issues Fixed
 
-See `docs/reviews/2026-03-21-devils-advocate.md` for full details. Critical items:
+All 4 critical issues from the devils advocate review have been resolved:
 
-1. No Remotion bundle caching (performance)
-2. Duration mismatches between registered and actual composition lengths
-3. Empty image fields from Gemini can cause render failures
-4. CSS transition in StepScene.tsx doesn't work in Remotion SSR
+| Issue | Fix | Status |
+|---|---|---|
+| No Remotion bundle caching | Added `getBundle()` with module-level cache in render.ts | FIXED |
+| Duration mismatches (dead frames / overflow) | Replaced static `durationInFrames` with `calculateMetadata` in Root.tsx | FIXED |
+| Empty image fields cause render failures | Added guards in ProductFlash.tsx and ShowcaseScene.tsx | FIXED |
+| CSS transition in StepScene.tsx | Removed `transition: "width 0.3s"` (doesn't work in Remotion SSR) | FIXED |
+| Duplicate import in worker.ts | Merged into single import statement | FIXED |
+
+See `docs/reviews/2026-03-21-devils-advocate.md` for remaining important/minor items.
 
 ---
 
 ## Summary
 
-**22/22 static tests passed. 8 runtime tests deferred (require credentials).**
+**22/22 static tests passed. 5 critical issues fixed. 8 runtime tests deferred (require credentials).**
 
-The template system is structurally sound: types, schemas, registry, compositions, worker pipeline, bot, and API route all compile and wire together correctly. Runtime verification with actual API calls is recommended before production deployment.
+The template system is structurally sound: types, schemas, registry, compositions, worker pipeline, bot, and API route all compile and wire together correctly. All critical render-blocking issues have been resolved. Runtime verification with actual API calls is recommended before production deployment.
