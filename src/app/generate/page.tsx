@@ -8,6 +8,7 @@ import { DEFAULT_STYLE } from "@/lib/types";
 import GenerationProgress from "@/components/GenerationProgress";
 import EditPanel from "@/components/EditPanel";
 import LiveChat from "@/components/LiveChat";
+import Navbar from "@/components/Navbar";
 
 const VideoPreview = dynamic(() => import("@/components/VideoPreview"), {
   ssr: false,
@@ -74,62 +75,72 @@ function GenerateContent() {
   // Completed state with edit UI
   if (status?.stage === "completed" && status.generatedScript) {
     return (
-      <div className="flex min-h-screen flex-col px-4 py-6 sm:px-8 animate-fade-in">
-        <button
-          onClick={() => router.push("/")}
-          className="btn-ghost mb-6 flex items-center gap-2 self-start px-3 py-1.5 text-sm"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back
-        </button>
+      <div className="flex min-h-screen flex-col animate-fade-in">
+        <Navbar />
 
-        <div className="flex flex-1 flex-col gap-8 lg:flex-row">
-          {/* Left: Video Preview */}
-          <div className="flex-1 lg:flex-[2]">
-            <VideoPreview
-              script={status.generatedScript}
-              style={compositionStyle}
-            />
-            {status.downloadUrl && (
-              <div className="mt-6">
-                <a
-                  href={status.downloadUrl}
-                  className="btn-primary inline-flex items-center gap-2 text-sm"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"
-                    />
-                  </svg>
-                  Download Video
-                </a>
-              </div>
-            )}
+        <div className="flex flex-1 flex-col px-4 py-6 sm:px-8">
+          {/* Video title and status */}
+          <div className="mb-6">
+            <h1
+              className="text-headline-md mb-2"
+              style={{ fontFamily: "var(--font-serif, Georgia, serif)" }}
+            >
+              {status.generatedScript.title}
+            </h1>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+              style={{
+                background: "rgba(125, 220, 142, 0.1)",
+                color: "#7ddc8e",
+                border: "1px solid rgba(125, 220, 142, 0.2)",
+              }}
+            >
+              <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Generated
+            </span>
           </div>
+
+          <div className="flex flex-1 flex-col gap-8 lg:flex-row">
+            {/* Left: Video Preview */}
+            <div className="flex-1 lg:flex-[2]">
+              <VideoPreview
+                script={status.generatedScript}
+                style={compositionStyle}
+              />
+              {status.downloadUrl && (
+                <div className="mt-6">
+                  <a
+                    href={status.downloadUrl}
+                    className="btn-primary inline-flex items-center gap-2 text-sm"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"
+                      />
+                    </svg>
+                    Download Video
+                  </a>
+                </div>
+              )}
+            </div>
 
           {/* Right: Edit Panel + Live Chat */}
           <div className="flex flex-col gap-6 lg:flex-1">
-            <div className="h-[300px] lg:h-[350px]">
+            <div className="min-h-[300px] lg:h-[350px]">
               <EditPanel
                 currentStyle={compositionStyle}
                 onStyleChange={handleStyleChange}
@@ -138,6 +149,7 @@ function GenerateContent() {
             <div className="h-[300px] lg:h-[350px]">
               <LiveChat />
             </div>
+          </div>
           </div>
         </div>
       </div>

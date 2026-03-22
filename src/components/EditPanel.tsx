@@ -96,13 +96,35 @@ export default function EditPanel({
       {/* History */}
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
         {history.length === 0 && (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex h-full flex-col items-center justify-center gap-4">
             <p
               className="text-center text-sm"
               style={{ color: "var(--outline)" }}
             >
               Describe how you&apos;d like to edit the video style
             </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Make title bigger", "Add dark overlay", "Hide subtitles", "Change font to serif"].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => setInstruction(suggestion)}
+                  className="rounded-full px-3 py-1.5 text-xs transition-colors"
+                  style={{
+                    background: "rgba(205, 189, 255, 0.08)",
+                    border: "1px solid rgba(205, 189, 255, 0.15)",
+                    color: "var(--primary)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(205, 189, 255, 0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(205, 189, 255, 0.08)";
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {history.map((entry, i) => (
@@ -112,6 +134,12 @@ export default function EditPanel({
             style={{ animationDelay: `${i * 0.05}s` }}
           >
             {/* User bubble */}
+            <span
+              className="text-label-md block px-1 mb-1"
+              style={{ fontSize: "0.5625rem", color: "var(--outline)", letterSpacing: "0.08em" }}
+            >
+              YOU
+            </span>
             <div
               className="rounded-lg px-3.5 py-2.5 text-sm"
               style={{
@@ -122,6 +150,12 @@ export default function EditPanel({
               {entry.instruction}
             </div>
             {/* AI explanation */}
+            <span
+              className="text-label-md block px-1 mt-2 mb-1"
+              style={{ fontSize: "0.5625rem", color: "var(--outline)", letterSpacing: "0.08em" }}
+            >
+              AI
+            </span>
             <p
               className="px-1 text-xs"
               style={{ color: "var(--on-surface-variant)" }}
@@ -134,6 +168,31 @@ export default function EditPanel({
             </span>
           </div>
         ))}
+        {isLoading && (
+          <div className="flex items-center gap-1 px-1 py-2">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{
+                background: "var(--primary)",
+                animation: "pulse 1.4s ease-in-out infinite",
+              }}
+            />
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{
+                background: "var(--primary)",
+                animation: "pulse 1.4s ease-in-out 0.2s infinite",
+              }}
+            />
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{
+                background: "var(--primary)",
+                animation: "pulse 1.4s ease-in-out 0.4s infinite",
+              }}
+            />
+          </div>
+        )}
         <div ref={historyEndRef} />
       </div>
 

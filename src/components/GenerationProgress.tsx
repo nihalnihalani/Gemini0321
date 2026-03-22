@@ -79,9 +79,11 @@ function SpinnerIcon() {
 function SceneCard({
   scene,
   index,
+  sceneTitle,
 }: {
   scene: SceneProgress;
   index: number;
+  sceneTitle?: string;
 }) {
   const statusConfig: Record<
     string,
@@ -138,6 +140,11 @@ function SceneCard({
           </span>
         </div>
       </div>
+      {sceneTitle && (
+        <p className="mt-2 text-xs text-[#cbc3d9] truncate opacity-70">
+          {sceneTitle}
+        </p>
+      )}
       {scene.status === "failed" && scene.error && (
         <p className="mt-3 text-xs text-[#ffb4ab] truncate">{scene.error}</p>
       )}
@@ -213,13 +220,23 @@ export default function GenerationProgress({
         <div className="space-y-2">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#2a292f]">
             <div
-              className="h-full rounded-full transition-all duration-700 ease-out"
+              className="relative h-full rounded-full transition-all duration-700 ease-out"
               style={{
                 width: `${status.progress}%`,
                 background:
                   "linear-gradient(90deg, #5c1fde 0%, #cdbdff 60%, #9ccaff 100%)",
               }}
-            />
+            >
+              <div
+                className="absolute inset-0 rounded-full animate-pulse"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 2s ease-in-out infinite",
+                }}
+              />
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <p className="text-sm text-[#cbc3d9]">{status.message}</p>
@@ -242,6 +259,7 @@ export default function GenerationProgress({
                 key={scene.scene_number}
                 scene={scene}
                 index={i}
+                sceneTitle={status.script?.scenes?.[i]?.title}
               />
             ))}
           </div>
@@ -254,7 +272,12 @@ export default function GenerationProgress({
           <p className="text-sm font-semibold text-[#ffb4ab]">
             Generation Failed
           </p>
-          <p className="mt-2 text-sm text-[#ffb4ab]/80">{status.error}</p>
+          <div className="mt-3 space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#ffb4ab]/60">
+              What went wrong
+            </p>
+            <p className="text-sm text-[#ffb4ab]/80">{status.error}</p>
+          </div>
         </div>
       )}
 
@@ -262,8 +285,19 @@ export default function GenerationProgress({
       {isCompleted && (
         <div className="space-y-5 animate-fade-in-up">
           <div className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#5c1fde]">
-              <CheckIcon />
+            <div
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#5c1fde]"
+              style={{
+                animation: "scale-spring 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both",
+              }}
+            >
+              <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
             </div>
             <h2 className="text-xl font-semibold tracking-tight text-[#e4e1e9]">
               Video Ready
@@ -274,11 +308,20 @@ export default function GenerationProgress({
           </div>
 
           {status.previewUrl && (
-            <video
-              src={status.previewUrl}
-              controls
-              className="w-full rounded-xl"
-            />
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{
+                background: "#0e0e13",
+                boxShadow: "0 4px 40px rgba(79, 0, 208, 0.08), 0 2px 20px rgba(0, 0, 0, 0.4)",
+                border: "1px solid rgba(73, 68, 86, 0.2)",
+              }}
+            >
+              <video
+                src={status.previewUrl}
+                controls
+                className="w-full rounded-lg"
+              />
+            </div>
           )}
 
           {status.downloadUrl && (
