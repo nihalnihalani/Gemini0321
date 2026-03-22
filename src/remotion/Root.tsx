@@ -4,6 +4,14 @@ import { z } from "zod";
 import { AIVideo, type AIVideoProps } from "./compositions/AIVideo";
 import { type GeneratedScript, DEFAULT_STYLE } from "../lib/types";
 import { CompositionStyleSchema } from "../lib/schemas";
+import { ProductLaunch } from "./templates/product-launch/ProductLaunch";
+import { ProductLaunchSchema } from "./templates/product-launch/schema";
+import { Explainer } from "./templates/explainer/Explainer";
+import { ExplainerSchema } from "./templates/explainer/schema";
+import { SocialPromo } from "./templates/social-promo/SocialPromo";
+import { SocialPromoSchema } from "./templates/social-promo/schema";
+import { BrandStory } from "./templates/brand-story/BrandStory";
+import { BrandStorySchema } from "./templates/brand-story/schema";
 
 const sceneSchema = z.object({
   scene_number: z.number(),
@@ -71,6 +79,7 @@ const defaultScript: GeneratedScript = {
 const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* Legacy AIVideo composition */}
       <Composition<typeof propsSchema, AIVideoProps>
         id="AIVideo"
         component={AIVideo}
@@ -86,6 +95,82 @@ const RemotionRoot: React.FC = () => {
             ),
           };
         }}
+      />
+
+      {/* Product Launch template */}
+      <Composition
+        id="ProductLaunch"
+        component={ProductLaunch}
+        fps={FPS}
+        width={1920}
+        height={1080}
+        schema={ProductLaunchSchema}
+        defaultProps={{
+          brandName: "Product",
+          tagline: "Your tagline here",
+          productImages: [],
+          features: ["Feature 1", "Feature 2"],
+          brandColor: "#1a1a2e",
+        }}
+        durationInFrames={35 * FPS}
+      />
+
+      {/* Explainer template */}
+      <Composition
+        id="Explainer"
+        component={Explainer}
+        fps={FPS}
+        width={1920}
+        height={1080}
+        schema={ExplainerSchema}
+        defaultProps={{
+          title: "How It Works",
+          steps: [
+            { title: "Step 1", description: "First step description" },
+            { title: "Step 2", description: "Second step description" },
+          ],
+          conclusion: "Now you understand!",
+        }}
+        durationInFrames={50 * FPS}
+      />
+
+      {/* Social Media Promo template */}
+      <Composition
+        id="SocialPromo"
+        component={SocialPromo}
+        fps={FPS}
+        width={1920}
+        height={1080}
+        schema={SocialPromoSchema}
+        defaultProps={{
+          hook: "You need this!",
+          productImage: "",
+          features: ["Fast", "Easy"],
+          cta: "Try Now",
+          aspectRatio: "16:9" as const,
+        }}
+        durationInFrames={20 * FPS}
+      />
+
+      {/* Brand Story template */}
+      <Composition
+        id="BrandStory"
+        component={BrandStory}
+        fps={FPS}
+        width={1920}
+        height={1080}
+        schema={BrandStorySchema}
+        defaultProps={{
+          companyName: "Company",
+          mission: "Our mission statement",
+          teamPhotos: [],
+          milestones: [
+            { year: "2020", event: "Founded" },
+            { year: "2024", event: "Milestone reached" },
+          ],
+          vision: "Our vision for the future",
+        }}
+        durationInFrames={50 * FPS}
       />
     </>
   );

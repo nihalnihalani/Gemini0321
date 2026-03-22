@@ -1,10 +1,14 @@
 import { generateScript } from "@/lib/gemini";
+import { generateTemplateContent } from "@/lib/gemini";
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
 import { generateMusic } from "@/lib/lyria";
-import { renderVideo } from "@/lib/render";
+import { renderVideo, renderTemplateVideo } from "@/lib/render";
 import { uploadFile, generateKey, getPublicUrl } from "@/lib/storage";
+import { extractYouTubeContent } from "@/lib/youtube";
+import { extractGitHubContent } from "@/lib/github";
+import { getTemplate } from "@/lib/templates";
 import { mkdir } from "fs/promises";
 import path from "path";
 import type {
@@ -13,6 +17,9 @@ import type {
   GeneratedScene,
   GeneratedScript,
   Scene,
+  TemplateId,
+  SourceType,
+  TemplateInput,
 } from "@/lib/types";
 import { DEFAULT_STYLE } from "@/lib/types";
 
@@ -27,10 +34,19 @@ const jobs: Map<string, JobStatus> =
 
 export { jobs };
 
+interface TemplateOptions {
+  templateId?: TemplateId;
+  sourceType?: SourceType;
+  sourceUrl?: string;
+  assets?: string[];
+  enableVeo?: boolean;
+}
+
 export function createJob(
   prompt: string,
   resolution: string,
-  sceneCount: number
+  sceneCount: number,
+  options?: TemplateOptions
 ): string {
   const jobId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -46,8 +62,12 @@ export function createJob(
 
   jobs.set(jobId, status);
 
-  // Kick off processing without awaiting
-  processJob(jobId, prompt, resolution, sceneCount);
+  // Use template pipeline if templateId provided, otherwise legacy
+  if (options?.templateId) {
+    processTemplateJob(jobId, prompt, resolution, options);
+  } else {
+    processJob(jobId, prompt, resolution, sceneCount);
+  }
 
   return jobId;
 }
@@ -433,6 +453,153 @@ export async function processJob(
         error instanceof Error ? error.message : "An unknown error occurred",
       error:
         error instanceof Error ? error.message : "An unknown error occurred",
+    });
+  }
+}
+
+/**
+ * Template-based generation pipeline.
+ * Stages: extract content -> generate template content -> generate music -> render -> upload
+ */
+async function processTemplateJob(
+  jobId: string,
+  prompt: string,
+  resolution: string,
+  options: TemplateOptions
+): Promise<void> {
+  const templateId = options.templateId!;
+  const sourceType = options.sourceType || "prompt";
+  const sourceUrl = options.sourceUrl;
+
+  try {
+    // Stage 1: Extract content from source (0-15%)
+    await updateJobPersistent(jobId, {
+      stage: "generating_script",
+      progress: 5,
+      message: "Extracting content from source...",
+    });
+
+    let sourceContent = prompt;
+
+    if (sourceType === "youtube" && sourceUrl) {
+      const ytMeta = await extractYouTubeContent(sourceUrl);
+      sourceContent = `Title: ${ytMeta.title}\nChannel: ${ytMeta.channelName}\nDescription: ${ytMeta.description}\n\nUser prompt: ${prompt}`;
+    } else if (sourceType === "github" && sourceUrl) {
+      const ghMeta = await extractGitHubContent(sourceUrl);
+      sourceContent = `Repository: ${ghMeta.name}\nDescription: ${ghMeta.description}\nLanguage: ${ghMeta.language}\nStars: ${ghMeta.stars}\nTopics: ${ghMeta.topics.join(", ")}\nFeatures: ${ghMeta.features.join(", ")}\nREADME:\n${ghMeta.readmeContent.slice(0, 2000)}\n\nUser prompt: ${prompt}`;
+    }
+
+    await updateJobPersistent(jobId, {
+      progress: 15,
+      message: "Content extracted",
+    });
+
+    // Stage 2: Generate template content via Gemini (15-40%)
+    await updateJobPersistent(jobId, {
+      progress: 20,
+      message: "Generating template content with Gemini...",
+    });
+
+    const templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
+
+    // Merge user-provided assets into template content
+    const enrichedContent = { ...templateContent } as Record<string, unknown>;
+    if (options.assets?.length) {
+      // Assign assets to the appropriate image field based on template
+      if (templateId === "product-launch") {
+        enrichedContent.productImages = options.assets;
+      } else if (templateId === "social-promo" && options.assets[0]) {
+        enrichedContent.productImage = options.assets[0];
+      } else if (templateId === "brand-story") {
+        enrichedContent.teamPhotos = options.assets;
+      }
+    }
+
+    await updateJobPersistent(jobId, {
+      progress: 40,
+      message: "Template content generated",
+    });
+
+    // Stage 3: Generate background music (40-60%)
+    await updateJobPersistent(jobId, {
+      progress: 45,
+      message: "Generating background music...",
+    });
+
+    const template = getTemplate(templateId);
+    const moodMap: Record<TemplateId, string> = {
+      "product-launch": "energetic, exciting, modern electronic",
+      "explainer": "calm, educational, light ambient",
+      "social-promo": "bold, upbeat, trendy pop",
+      "brand-story": "inspiring, cinematic, emotional orchestral",
+    };
+
+    let musicUrl: string | undefined;
+    try {
+      const musicPath = await generateMusic(moodMap[templateId], {
+        durationSeconds: template.defaultDurationSeconds,
+        mood: moodMap[templateId],
+      });
+      const musicKey = generateKey(jobId, "music.wav");
+      musicUrl = await uploadFile(musicPath, musicKey);
+      console.log(`Music generated and uploaded: ${musicUrl}`);
+    } catch (err) {
+      console.error(`Music generation failed: ${err instanceof Error ? err.message : err}`);
+    }
+
+    await updateJobPersistent(jobId, {
+      progress: 60,
+      message: "Music generated",
+    });
+
+    // Stage 4: Render via Remotion (60-90%)
+    await updateJobPersistent(jobId, {
+      stage: "composing_video",
+      progress: 65,
+      message: "Composing video with Remotion...",
+    });
+
+    const renderDir = "/tmp/renders";
+    await mkdir(renderDir, { recursive: true });
+    const outputPath = `${renderDir}/${jobId}.mp4`;
+
+    const renderProps = { ...enrichedContent, musicUrl } as TemplateInput & { musicUrl?: string };
+
+    let downloadUrl: string;
+    try {
+      const renderStart = Date.now();
+      console.log(`Starting Remotion template render for job ${jobId} (${templateId})...`);
+
+      await renderTemplateVideo(templateId, renderProps, outputPath);
+
+      const renderDuration = ((Date.now() - renderStart) / 1000).toFixed(1);
+      console.log(`Remotion render completed in ${renderDuration}s for job ${jobId}`);
+
+      await updateJobPersistent(jobId, {
+        progress: 90,
+        message: "Uploading final video...",
+      });
+
+      const downloadKey = generateKey(jobId, "final.mp4");
+      downloadUrl = await uploadFile(outputPath, downloadKey);
+    } catch (err) {
+      console.error(`Remotion render failed: ${err instanceof Error ? err.message : err}`);
+      const downloadKey = generateKey(jobId, "final.mp4");
+      downloadUrl = getPublicUrl(downloadKey);
+    }
+
+    // Stage 5: Completed
+    await updateJobPersistent(jobId, {
+      stage: "completed",
+      progress: 100,
+      message: "Video generation completed",
+      downloadUrl,
+    });
+  } catch (error) {
+    await updateJobPersistent(jobId, {
+      stage: "failed",
+      message: error instanceof Error ? error.message : "An unknown error occurred",
+      error: error instanceof Error ? error.message : "An unknown error occurred",
     });
   }
 }

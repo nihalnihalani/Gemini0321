@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { prompt, resolution, sceneCount } = parsed.data;
+    const { prompt, templateId, sourceType, sourceUrl, assets, enableVeo, resolution, sceneCount } = parsed.data;
 
     let jobId: string;
     try {
@@ -27,7 +27,13 @@ export async function POST(request: Request) {
       jobId = await createBullJob(prompt, resolution, sceneCount);
     } catch {
       // Fall back to in-memory
-      jobId = createInMemoryJob(prompt, resolution, sceneCount);
+      jobId = createInMemoryJob(prompt, resolution, sceneCount, {
+        templateId,
+        sourceType,
+        sourceUrl,
+        assets,
+        enableVeo,
+      });
     }
 
     const response: GenerateResponse = {
