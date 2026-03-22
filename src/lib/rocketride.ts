@@ -1,4 +1,8 @@
-import { RocketRideClient } from "rocketride";
+import { createRequire } from "module";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { RocketRideClient } = createRequire(import.meta.url)("rocketride") as { RocketRideClient: any };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RocketRideClient = any;
 import type { Script, TemplateId, SourceType, TemplateInput } from "./types";
 import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema } from "./schemas";
 import { z } from "zod";
@@ -67,10 +71,10 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
         onConnected: async () => {
           console.log("[RocketRide] Connected to engine");
         },
-        onDisconnected: async (reason) => {
+        onDisconnected: async (reason: unknown) => {
           console.warn(`[RocketRide] Disconnected: ${reason}`);
         },
-        onConnectError: async (message) => {
+        onConnectError: async (message: unknown) => {
           console.error(`[RocketRide] Connection error: ${message}`);
         },
       });
