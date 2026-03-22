@@ -1,8 +1,11 @@
 /**
  * Quick integration test for RocketRide setup.
- * Tests: connection, pipeline validation, and a live script generation run.
+ * Works for both local and remote (ngrok/tunnel) connections.
  *
  * Usage: node test-rocketride.mjs
+ *
+ * For remote connections via ngrok, the SDK's normalizeUri appends :5565
+ * which breaks tunneled URLs. This script patches the URI to work correctly.
  */
 import { config } from "dotenv";
 config();
@@ -13,12 +16,22 @@ const { RocketRideClient } = require("rocketride");
 import { readFileSync } from "fs";
 import path from "path";
 
-const URI = process.env.ROCKETRIDE_URI || "http://localhost:5565";
+const RAW_URI = process.env.ROCKETRIDE_URI || "http://localhost:5565";
 const AUTH = process.env.ROCKETRIDE_APIKEY || "";
 const GEMINI_KEY = process.env.ROCKETRIDE_APIKEY_GEMINI || process.env.GEMINI_API_KEY || "";
 
+// Detect if URI is a tunnel (https:// that is NOT localhost)
+const isTunnel = /^https?:\/\/(?!localhost)/.test(RAW_URI) && !RAW_URI.includes("localhost");
+
+// Build the correct WebSocket URI
+// For tunnels: bypass normalizeUri which wrongly appends :5565
+const WS_URI = isTunnel
+  ? RAW_URI.replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://").replace(/\/?$/, "/task/service")
+  : RAW_URI; // local — let SDK handle it normally
+
 console.log("=== RocketRide Integration Test ===\n");
-console.log(`Engine URI: ${URI}`);
+console.log(`Raw URI:    ${RAW_URI}`);
+console.log(`WS URI:     ${WS_URI}${isTunnel ? " (tunnel mode)" : " (local mode)"}`);
 console.log(`API Key:    ${AUTH ? AUTH.slice(0, 6) + "..." : "(not set)"}`);
 console.log(`Gemini Key: ${GEMINI_KEY ? GEMINI_KEY.slice(0, 8) + "..." : "(not set)"}`);
 console.log();
@@ -26,18 +39,34 @@ console.log();
 // Step 1: Connect
 console.log("[1/4] Connecting to RocketRide engine...");
 const client = new RocketRideClient({
-  uri: URI,
+  uri: isTunnel ? "http://localhost:5565" : RAW_URI, // dummy for tunnel, real for local
   auth: AUTH,
   persist: false,
   onConnectError: async (msg) => console.error(`  Connection error: ${msg}`),
 });
 
+// For tunnel mode: override the internal URI to bypass normalizeUri
+if (isTunnel) {
+  client._getWebsocketUri = () => WS_URI;
+  client._setUri = function () { this._uri = WS_URI; };
+  client._uri = WS_URI;
+}
+
 try {
-  await client.connect(10000);
-  console.log("  Connected successfully!\n");
+  await client.connect(15000);
+  console.log("  Connected successfully!");
+  console.log("  Transport:", JSON.stringify(client.getConnectionInfo()));
+  console.log();
 } catch (err) {
   console.error(`  FAILED to connect: ${err.message}`);
-  console.error("  Is the Docker container running? Check: docker ps | grep rocketride");
+  if (isTunnel) {
+    console.error("  Tunnel troubleshooting:");
+    console.error("  1. Is the ngrok/tunnel process running on the host machine?");
+    console.error("  2. Is the RocketRide Docker container running on the host?");
+    console.error("  3. Try: curl -H 'ngrok-skip-browser-warning: true' " + RAW_URI);
+  } else {
+    console.error("  Is the Docker container running? Check: docker ps | grep rocketride");
+  }
   process.exit(1);
 }
 
@@ -64,7 +93,7 @@ try {
   console.log("  (This may be expected if the engine doesn't support validate for this pipeline type)\n");
 }
 
-// Step 4: Test pipeline execution (mirrors rocketride.ts logic)
+// Step 4: Test pipeline execution
 console.log("[4/4] Running video-script pipeline with text/plain...");
 try {
   const pipelinePath = path.resolve("pipelines/video-script.pipe");
@@ -79,10 +108,13 @@ try {
   if (result && result.answers && Array.isArray(result.answers) && result.answers.length > 0) {
     console.log("  Got answers from pipeline!");
 
-    // Parse the answer (strip code fences like rocketride.ts does)
     let raw = result.answers[0];
     if (typeof raw === "string") {
-      raw = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+      // Strip code fences (handles preamble text, nested fences, etc.)
+      let stripped = raw.replace(/^[\s\S]*?```(?:json|JSON)?\s*\n/, "");
+      stripped = stripped.replace(/\n?```[\s\S]*$/, "");
+      raw = (stripped !== raw ? stripped : raw).trim();
+
       try {
         const parsed = JSON.parse(raw);
         console.log(`  Parsed Script JSON successfully!`);

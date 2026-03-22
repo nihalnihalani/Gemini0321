@@ -36,8 +36,12 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
 
   if (!connecting) {
     connecting = (async () => {
+      const rawUri = process.env.ROCKETRIDE_URI!;
+      // Detect tunnel URLs (https:// that aren't localhost)
+      const isTunnel = /^https?:\/\/(?!localhost)/.test(rawUri) && !rawUri.includes("localhost");
+
       client = new RocketRideClient({
-        uri: process.env.ROCKETRIDE_URI!,
+        uri: isTunnel ? "http://localhost:5565" : rawUri, // dummy for tunnel; real for local
         auth: process.env.ROCKETRIDE_APIKEY!,
         persist: true,
         maxRetryTime: 300000,
@@ -51,7 +55,21 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
           console.error(`[RocketRide] Connection error: ${message}`);
         },
       });
-      await client.connect(10000);
+
+      // For tunnel mode: override URI to bypass SDK's normalizeUri which appends :5565
+      if (isTunnel) {
+        const wsUri = rawUri
+          .replace(/^https:\/\//, "wss://")
+          .replace(/^http:\/\//, "ws://")
+          .replace(/\/?$/, "/task/service");
+        const c = client as unknown as Record<string, unknown>;
+        c._getWebsocketUri = () => wsUri;
+        c._setUri = function () { (this as Record<string, unknown>)._uri = wsUri; };
+        c._uri = wsUri;
+        console.log(`[RocketRide] Tunnel mode: ${wsUri}`);
+      }
+
+      await client.connect(15000);
     })().catch((err) => {
       // Reset client on failure so next call retries cleanly
       client = null;
