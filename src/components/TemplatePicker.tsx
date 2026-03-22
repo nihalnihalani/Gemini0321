@@ -1,16 +1,30 @@
 "use client";
 
-import type { TemplateId, TemplateConfig } from "@/lib/types";
+import type { TemplateId, TemplateIdOrCustom, TemplateConfig } from "@/lib/types";
 import type { ReactNode } from "react";
 import { TEMPLATES } from "@/lib/templates";
 
 interface TemplatePickerProps {
-  selected: TemplateId;
-  onChange: (templateId: TemplateId) => void;
+  selected: TemplateIdOrCustom;
+  onChange: (templateId: TemplateIdOrCustom) => void;
   disabled?: boolean;
 }
 
-const TEMPLATE_ICONS: Record<TemplateId, ReactNode> = {
+const CUSTOM_OPTION = {
+  id: "custom" as const,
+  name: "Custom",
+  description: "Freestyle — AI generates scenes from your prompt with full creative freedom",
+  defaultDurationSeconds: 30,
+  defaultAspectRatio: "16:9" as const,
+  compositionId: "AIVideo",
+};
+
+const TEMPLATE_ICONS: Record<TemplateIdOrCustom, ReactNode> = {
+  custom: (
+    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+    </svg>
+  ),
   "product-launch": (
     <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.841m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
@@ -38,14 +52,14 @@ export default function TemplatePicker({
   onChange,
   disabled,
 }: TemplatePickerProps) {
-  const templates = Object.values(TEMPLATES) as TemplateConfig[];
+  const templates = [CUSTOM_OPTION, ...(Object.values(TEMPLATES) as TemplateConfig[])] as { id: TemplateIdOrCustom; name: string; description: string }[];
 
   return (
     <div className="space-y-3">
       <label className="text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-[var(--outline)]">
         Template
       </label>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {templates.map((t) => {
           const isSelected = selected === t.id;
           return (

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobs } from "@/queue/worker";
-import { terminateTask } from "@/lib/rocketride";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,6 +41,7 @@ export async function POST(
   // Terminate RocketRide pipeline if a token was captured
   if (token) {
     try {
+      const { terminateTask } = await import("@/lib/rocketride");
       await terminateTask(token);
       console.log(`[RocketRide] Terminated pipeline for job ${jobId}`);
     } catch (err) {

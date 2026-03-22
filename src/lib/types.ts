@@ -169,6 +169,7 @@ export interface GenerateResponse {
 
 // Template system types
 export type TemplateId = 'product-launch' | 'explainer' | 'social-promo' | 'brand-story';
+export type TemplateIdOrCustom = TemplateId | 'custom';
 
 export interface ProductLaunchInput {
   brandName: string;

@@ -7,13 +7,13 @@ import TemplatePicker from "@/components/TemplatePicker";
 import EngineSelector from "@/components/EngineSelector";
 import AssetUploader from "@/components/AssetUploader";
 import Navbar from "@/components/Navbar";
-import type { TemplateId, GenerationEngine } from "@/lib/types";
+import type { TemplateIdOrCustom, GenerationEngine } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [templateId, setTemplateId] = useState<TemplateId>("product-launch");
+  const [templateId, setTemplateId] = useState<TemplateIdOrCustom>("custom");
   const [assets, setAssets] = useState<string[]>([]);
   const [engine, setEngine] = useState<GenerationEngine>("auto");
 
@@ -33,7 +33,7 @@ export default function Home() {
           prompt,
           resolution,
           sceneCount,
-          templateId,
+          templateId: templateId === "custom" ? undefined : templateId,
           engine,
           sourceType: source?.type ?? "prompt",
           sourceUrl: source?.url,

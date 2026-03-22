@@ -1,5 +1,5 @@
 import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/lib/gemini";
-import { runScriptPipeline, runTemplateContentPipeline } from "@/lib/rocketride";
+// rocketride imported dynamically where used to avoid ESM resolution errors
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
@@ -64,7 +64,7 @@ export function createJob(
 
   const engine: GenerationEngine = options?.engine ?? "auto";
 
-  // Use template pipeline if templateId provided, otherwise legacy
+  // Use template pipeline if templateId provided, otherwise freestyle/custom
   if (options?.templateId) {
     processTemplateJob(jobId, prompt, resolution, options);
   } else {
@@ -129,7 +129,8 @@ export async function processJob(
     let script;
     try {
       try {
-        script = await runScriptPipeline(prompt, sceneCount, (token) => {
+        const { runScriptPipeline } = await import("@/lib/rocketride");
+        script = await runScriptPipeline(prompt, sceneCount, (token: string) => {
           // Synchronous — must stay sync to avoid race with cancel endpoint
           updateJob(jobId, { rocketrideToken: token });
         });
@@ -534,7 +535,8 @@ async function processTemplateJob(
     let templateContent: TemplateInput;
     try {
       try {
-        templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token) => {
+        const { runTemplateContentPipeline } = await import("@/lib/rocketride");
+        templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token: string) => {
           updateJob(jobId, { rocketrideToken: token });
         });
         console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);

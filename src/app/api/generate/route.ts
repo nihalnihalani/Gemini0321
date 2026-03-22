@@ -15,7 +15,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { prompt, templateId, sourceType, sourceUrl, assets, enableVeo, resolution, sceneCount } = parsed.data;
+    const { prompt, templateId: rawTemplateId, sourceType, sourceUrl, assets, enableVeo, engine, resolution, sceneCount } = parsed.data;
+    const templateId = rawTemplateId === "custom" ? undefined : rawTemplateId;
 
     let jobId: string;
     try {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
         sourceUrl,
         assets,
         enableVeo,
+        engine,
       });
     }
 
