@@ -249,7 +249,7 @@
 
 ### 6.1 `.env.local` overrides `.env` with expired Gemini key
 - **Severity:** Critical
-- **Description:** `.env.local` had `GEMINI_API_KEY=AIzaSyCHtTakouq4i7mZ5WsbNf_AtubUZGPqPx0` (expired). Next.js loads `.env.local` with higher priority than `.env`.
+- **Description:** `.env.local` had an expired `GEMINI_API_KEY`. Next.js loads `.env.local` with higher priority than `.env`.
 - **Symptom:** `API key not valid. Please pass a valid API key.`
 - **Fix:** Updated `.env.local` with the working key.
 
