@@ -69,11 +69,7 @@
     {
       "id": "response_1",
       "provider": "response",
-      "config": {
-        "keys": {
-          "answers": "answers"
-        }
-      },
+      "config": {},
       "input": [
         {
           "lane": "answers",

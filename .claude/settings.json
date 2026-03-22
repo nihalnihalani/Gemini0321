@@ -4,7 +4,7 @@
       "command": "rocketride-mcp",
       "env": {
         "ROCKETRIDE_URI": "http://localhost:5565",
-        "ROCKETRIDE_APIKEY": "${ROCKETRIDE_APIKEY}"
+        "ROCKETRIDE_APIKEY": "MY_API_KEY"
       }
     }
   }
