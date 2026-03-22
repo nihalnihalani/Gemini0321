@@ -3,7 +3,7 @@ import { createRequire } from "module";
 const { RocketRideClient } = createRequire(import.meta.url)("rocketride") as { RocketRideClient: any };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RocketRideClient = any;
-import type { Script, TemplateId, SourceType, TemplateInput, CompositionStyle, Scene } from "./types";
+import type { Script, TemplateId, SourceType, TemplateInput, CompositionStyle } from "./types";
 import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema, CompositionStyleSchema } from "./schemas";
 import { z } from "zod";
 import { readFileSync } from "fs";
@@ -14,8 +14,9 @@ let connecting: Promise<void> | null = null;
 let activePipelines = 0;
 
 const PIPELINE_DIR = path.resolve(process.cwd(), "pipelines");
-const SEND_TIMEOUT_MS = 120_000; // 2 minutes max for Gemini response
-const TERMINATE_TIMEOUT_MS = 5_000; // 5 seconds max for cleanup
+const SEND_TIMEOUT_MS = 120_000; // 2 minutes for simple pipelines
+const MASTER_TIMEOUT_MS = 300_000; // 5 minutes for multi-step master pipelines (4 LLM calls)
+const TERMINATE_TIMEOUT_MS = 5_000;
 
 /**
  * Load a .pipe file and inject env vars.
@@ -25,12 +26,9 @@ const TERMINATE_TIMEOUT_MS = 5_000; // 5 seconds max for cleanup
 function loadPipeline(filename: string): Record<string, unknown> {
   const filepath = path.join(PIPELINE_DIR, filename);
   let content = readFileSync(filepath, "utf-8");
-
-  // Replace ${VAR_NAME} with process.env.VAR_NAME
   content = content.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_match, varName) => {
     return process.env[varName] ?? "";
   });
-
   return JSON.parse(content);
 }
 
@@ -48,7 +46,6 @@ function isEnabled(): boolean {
 
 /**
  * Get or create a singleton RocketRideClient.
- * Uses an atomic guard to prevent race conditions on concurrent calls.
  */
 export async function getRocketRideClient(): Promise<RocketRideClient> {
   if (!isEnabled()) {
@@ -60,26 +57,18 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
   if (!connecting) {
     connecting = (async () => {
       const rawUri = process.env.ROCKETRIDE_URI!;
-      // Detect tunnel URLs (https:// that aren't localhost)
       const isTunnel = /^https?:\/\/(?!localhost)/.test(rawUri) && !rawUri.includes("localhost");
 
       client = new RocketRideClient({
-        uri: isTunnel ? "http://localhost:5565" : rawUri, // dummy for tunnel; real for local
+        uri: isTunnel ? "http://localhost:5565" : rawUri,
         auth: process.env.ROCKETRIDE_APIKEY!,
         persist: true,
         maxRetryTime: 300000,
-        onConnected: async () => {
-          console.log("[RocketRide] Connected to engine");
-        },
-        onDisconnected: async (reason: unknown) => {
-          console.warn(`[RocketRide] Disconnected: ${reason}`);
-        },
-        onConnectError: async (message: unknown) => {
-          console.error(`[RocketRide] Connection error: ${message}`);
-        },
+        onConnected: async () => { console.log("[RocketRide] Connected to engine"); },
+        onDisconnected: async (reason: unknown) => { console.warn(`[RocketRide] Disconnected: ${reason}`); },
+        onConnectError: async (message: unknown) => { console.error(`[RocketRide] Connection error: ${message}`); },
       });
 
-      // For tunnel mode: override URI to bypass SDK's normalizeUri which appends :5565
       if (isTunnel) {
         const wsUri = rawUri
           .replace(/^https:\/\//, "wss://")
@@ -94,7 +83,6 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
 
       await client.connect(15000);
     })().catch((err) => {
-      // Reset client on failure so next call retries cleanly
       client = null;
       throw err;
     }).finally(() => {
@@ -103,30 +91,18 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
   }
 
   await connecting;
-
-  if (!client?.isConnected()) {
-    throw new Error("[RocketRide] Failed to connect");
-  }
+  if (!client?.isConnected()) throw new Error("[RocketRide] Failed to connect");
   return client;
 }
 
-/**
- * Strip markdown code fences from LLM responses.
- * Handles preamble text, nested fences, trailing whitespace, and no-fence input.
- */
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
 function stripCodeFences(text: string): string {
-  // Remove optional preamble + opening fence
   let stripped = text.replace(/^[\s\S]*?```(?:json|JSON)?\s*\n/, "");
-  // Remove closing fence + anything after
   stripped = stripped.replace(/\n?```[\s\S]*$/, "");
-  // If no fence was present, stripped equals text — return trimmed original
   return (stripped !== text ? stripped : text).trim();
 }
 
-/**
- * Attempt to parse a raw string as JSON, stripping code fences first.
- * Throws a descriptive error with a preview of the raw input on failure.
- */
 function tryParseJson(raw: string, label: string): unknown {
   try {
     return JSON.parse(stripCodeFences(raw));
@@ -139,16 +115,10 @@ function tryParseJson(raw: string, label: string): unknown {
   }
 }
 
-/**
- * Extract structured data from a pipeline result.
- * Handles answers array, data field, or raw result.
- */
 function extractResultData(result: Record<string, unknown>): unknown {
   const answers = result.answers;
   if (Array.isArray(answers) && answers.length > 0) {
-    if (answers[0] == null) {
-      throw new Error("[RocketRide] Pipeline returned null answer");
-    }
+    if (answers[0] == null) throw new Error("[RocketRide] Pipeline returned null answer");
     return typeof answers[0] === "string" ? tryParseJson(answers[0], "answers[0]") : answers[0];
   }
   if (result.data != null) {
@@ -157,9 +127,15 @@ function extractResultData(result: Record<string, unknown>): unknown {
   return result;
 }
 
-/**
- * Wrap a promise with a timeout.
- */
+function extractResultText(result: Record<string, unknown>): string {
+  const answers = result.answers;
+  if (Array.isArray(answers) && answers.length > 0 && answers[0] != null) {
+    return typeof answers[0] === "string" ? answers[0] : JSON.stringify(answers[0]);
+  }
+  if (typeof result.data === "string") return result.data;
+  return JSON.stringify(result);
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     promise,
@@ -169,9 +145,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-/**
- * Safely terminate a pipeline with a timeout so the finally block never hangs.
- */
 async function safeTerminate(rc: RocketRideClient, token: string): Promise<void> {
   await Promise.race([
     rc.terminate(token),
@@ -181,24 +154,42 @@ async function safeTerminate(rc: RocketRideClient, token: string): Promise<void>
   ]).catch(() => {});
 }
 
+// ─── Composite Schema for Video Master Pipeline ─────────────────────────────
+
+const EnhancedSceneSchema = z.object({
+  scene_number: z.number(),
+  enhanced_prompt: z.string(),
+  negative_prompt: z.string().optional().default("text, watermark, low quality, blurry, distorted"),
+  style_preset: z.string().optional().default("cinematic"),
+});
+
+const VideoMasterResultSchema = z.object({
+  script: ScriptSchema,
+  enhanced_scenes: z.array(EnhancedSceneSchema),
+});
+
+export type VideoMasterResult = z.infer<typeof VideoMasterResultSchema>;
+
+// ─── Master Pipelines (Multi-Step, Multi-LLM) ───────────────────────────────
+
 /**
- * Run the video-script pipeline to generate a structured Script.
+ * VIDEO MASTER PIPELINE — The centerpiece.
+ * 10 components, 4 chained Gemini nodes in a single pipeline execution:
+ *   Generate Script → Quality Review → Select Best → Enhance for Veo
  *
- * @param onToken — called with the pipeline token immediately after `use()`,
- *                  so the caller can store it for cancellation.
- *                  NOTE: must remain synchronous to avoid race conditions.
+ * Replaces the old serial calls: runScriptPipeline + runQualityReviewPipeline + runSceneEnhancerPipeline
  */
-export async function runScriptPipeline(
+export async function runVideoMasterPipeline(
   prompt: string,
   sceneCount: number,
   onToken?: (token: string) => void
-): Promise<Script> {
+): Promise<VideoMasterResult> {
   const rc = await getRocketRideClient();
 
-  const pipeline = loadPipeline("video-script.pipe");
+  const pipeline = loadPipeline("video-master.pipe");
   const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
     throw new Error(
-      `[RocketRide] Failed to start video-script pipeline: ${err instanceof Error ? err.message : err}`
+      `[RocketRide] Failed to start video-master pipeline: ${err instanceof Error ? err.message : err}`
     );
   });
 
@@ -212,15 +203,38 @@ export async function runScriptPipeline(
 
     const result = await withTimeout(
       rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
-      SEND_TIMEOUT_MS,
-      "Script generation"
+      MASTER_TIMEOUT_MS,
+      "Video master pipeline (generate→review→merge→enhance)"
     );
 
-    if (!result) {
-      throw new Error("[RocketRide] Pipeline returned no result");
+    if (!result) throw new Error("[RocketRide] Video master pipeline returned no result");
+
+    const data = extractResultData(result as Record<string, unknown>);
+
+    // The final output from gemini_enhance should be { script, enhanced_scenes }
+    // Try composite schema first, fall back to treating as raw script
+    const composite = VideoMasterResultSchema.safeParse(data);
+    if (composite.success) return composite.data;
+
+    // Fallback: the pipeline might have returned just the script (if enhance node output differently)
+    const scriptOnly = ScriptSchema.safeParse(data);
+    if (scriptOnly.success) {
+      return {
+        script: scriptOnly.data,
+        enhanced_scenes: [],
+      };
     }
 
-    return ScriptSchema.parse(extractResultData(result as Record<string, unknown>));
+    // Last resort: try to extract script from nested structure
+    const asRecord = data as Record<string, unknown>;
+    if (asRecord.script) {
+      return {
+        script: ScriptSchema.parse(asRecord.script),
+        enhanced_scenes: Array.isArray(asRecord.enhanced_scenes) ? asRecord.enhanced_scenes as VideoMasterResult["enhanced_scenes"] : [],
+      };
+    }
+
+    throw new Error("[RocketRide] Video master pipeline returned unparseable result");
   } finally {
     activePipelines--;
     await safeTerminate(rc, token);
@@ -228,9 +242,86 @@ export async function runScriptPipeline(
 }
 
 /**
- * Run the template-content pipeline to generate template-specific content.
+ * EDITORIAL MASTER PIPELINE — 3-step creative pipeline.
+ * 8 components, 3 chained Gemini nodes:
+ *   Deep Analysis → Beat Planning → Copy Refinement
  *
- * @param onToken — called with the pipeline token immediately after `use()`.
+ * Replaces the old single-LLM runEditorialBrainPipeline.
+ */
+export async function runEditorialMasterPipeline(
+  planningPrompt: string,
+  onToken?: (token: string) => void
+): Promise<unknown> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("editorial-master.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start editorial-master pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const result = await withTimeout(
+      rc.send(token, planningPrompt, { name: "prompt.txt" }, "text/plain"),
+      MASTER_TIMEOUT_MS,
+      "Editorial master pipeline (analyze→plan→refine)"
+    );
+
+    if (!result) throw new Error("[RocketRide] Editorial master pipeline returned no result");
+    return extractResultData(result as Record<string, unknown>);
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+/**
+ * GITHUB ANALYSIS PIPELINE — routes repo analysis through RocketRide.
+ * Replaces direct Gemini call in processEditorialJob.
+ */
+export async function runGitHubAnalysisPipeline(
+  repoContent: string,
+  onToken?: (token: string) => void
+): Promise<string> {
+  const rc = await getRocketRideClient();
+
+  const pipeline = loadPipeline("github-analysis.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
+    throw new Error(
+      `[RocketRide] Failed to start github-analysis pipeline: ${err instanceof Error ? err.message : err}`
+    );
+  });
+
+  activePipelines++;
+  try {
+    try { onToken?.(token); } catch (cbErr) {
+      console.warn("[RocketRide] onToken callback threw:", cbErr);
+    }
+
+    const result = await withTimeout(
+      rc.send(token, repoContent, { name: "prompt.txt" }, "text/plain"),
+      SEND_TIMEOUT_MS,
+      "GitHub analysis"
+    );
+
+    if (!result) throw new Error("[RocketRide] GitHub analysis pipeline returned no result");
+    return extractResultText(result as Record<string, unknown>);
+  } finally {
+    activePipelines--;
+    await safeTerminate(rc, token);
+  }
+}
+
+// ─── Single-Step Pipelines (kept for independent use) ────────────────────────
+
+/**
+ * Run the template-content pipeline to generate template-specific content.
  */
 export async function runTemplateContentPipeline(
   templateId: TemplateId,
@@ -258,14 +349,14 @@ export async function runTemplateContentPipeline(
       : "user prompt";
 
     const TEMPLATE_SCHEMAS_HINT: Record<string, string> = {
-      "product-launch": `{"brandName":"string","tagline":"string (max 12 words, punchy hook)","productImages":[],"features":["string","string","string"],"brandColor":"#hexcolor","logoUrl":""}`,
+      "product-launch": `{"brandName":"string","tagline":"string (max 12 words)","productImages":[],"features":["string"],"brandColor":"#hex","logoUrl":""}`,
       "explainer": `{"title":"string","steps":[{"title":"string","description":"string","iconUrl":""}],"conclusion":"string","introNarration":"string","summaryNarration":"string"}`,
-      "social-promo": `{"hook":"string (3-6 words)","productImage":"","features":["string","string","string"],"cta":"string (2-4 words)","aspectRatio":"9:16"}`,
+      "social-promo": `{"hook":"string (3-6 words)","productImage":"","features":["string"],"cta":"string (2-4 words)","aspectRatio":"9:16"}`,
       "brand-story": `{"companyName":"string","mission":"string","teamPhotos":[],"milestones":[{"year":"string","event":"string"}],"vision":"string","logoUrl":""}`,
     };
 
     const schemaHint = TEMPLATE_SCHEMAS_HINT[templateId] ?? "";
-    const input = `Generate video content for a "${templateId}" template from the following ${sourceLabel}:\n\n${sourceContent}\n\nReturn ONLY a valid JSON object with EXACTLY this structure (no extra fields, no wrapping object):\n${schemaHint}`;
+    const input = `Generate video content for a "${templateId}" template from the following ${sourceLabel}:\n\n${sourceContent}\n\nReturn ONLY a valid JSON object with EXACTLY this structure:\n${schemaHint}`;
 
     const result = await withTimeout(
       rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
@@ -273,84 +364,12 @@ export async function runTemplateContentPipeline(
       "Template content generation"
     );
 
-    if (!result) {
-      throw new Error("[RocketRide] Pipeline returned no result");
-    }
+    if (!result) throw new Error("[RocketRide] Pipeline returned no result");
 
     const data = extractResultData(result as Record<string, unknown>);
-
-    // Validate against the template-specific schema
     const schema = TEMPLATE_SCHEMAS[templateId];
-    if (schema) {
-      return schema.parse(data) as TemplateInput;
-    }
+    if (schema) return schema.parse(data) as TemplateInput;
     return data as TemplateInput;
-  } finally {
-    activePipelines--;
-    await safeTerminate(rc, token);
-  }
-}
-
-/**
- * Run the editorial brain pipeline for LLM-based narrative planning.
- * Returns the raw LLM response which is parsed by brain.ts's buildPlanFromLLMObject().
- */
-export async function runEditorialBrainPipeline(
-  planningPrompt: string,
-  onToken?: (token: string) => void
-): Promise<unknown> {
-  const rc = await getRocketRideClient();
-
-  const pipeline = loadPipeline("editorial-brain.pipe");
-  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
-    throw new Error(
-      `[RocketRide] Failed to start editorial-brain pipeline: ${err instanceof Error ? err.message : err}`
-    );
-  });
-
-  activePipelines++;
-  try {
-    try { onToken?.(token); } catch (cbErr) {
-      console.warn("[RocketRide] onToken callback threw:", cbErr);
-    }
-
-    const prompt = `${planningPrompt}
-
-Return strict JSON with:
-{
-  "intent": { "promise": string, "tone": string, "visualAnchor": string, "audience": string },
-  "orderedSectionIds": string[],
-  "directives": Array<{
-    "id": string,
-    "role": "hook" | "hero" | "detail" | "contrast" | "close" | "breather",
-    "sectionId"?: string,
-    "rhythm": "whisper" | "hold" | "reveal" | "contrast" | "blank",
-    "copyFragments": string[],
-    "assetRole"?: "hero_object" | "detail_crop" | "context_frame" | "closing_object",
-    "granularity"?: "phrase" | "word" | "letter",
-    "layoutHint"?: "center" | "hero-top" | "gallery-left" | "gallery-right" | "full-bleed" | "contrast-split",
-    "transitionHint"?: "gentle" | "crisp" | "glide" | "lift",
-    "durationSec": number
-  }>
-}
-
-Rules:
-- 5 to 8 directives only
-- target 30 to 45 seconds total
-- max 4 words per fragment
-- restrained, elegant style`;
-
-    const result = await withTimeout(
-      rc.send(token, prompt, { name: "prompt.txt" }, "text/plain"),
-      SEND_TIMEOUT_MS,
-      "Editorial brain planning"
-    );
-
-    if (!result) {
-      throw new Error("[RocketRide] Editorial brain pipeline returned no result");
-    }
-
-    return extractResultData(result as Record<string, unknown>);
   } finally {
     activePipelines--;
     await safeTerminate(rc, token);
@@ -389,9 +408,7 @@ export async function runStyleEditorPipeline(
       "Style editing"
     );
 
-    if (!result) {
-      throw new Error("[RocketRide] Style editor pipeline returned no result");
-    }
+    if (!result) throw new Error("[RocketRide] Style editor pipeline returned no result");
 
     const data = extractResultData(result as Record<string, unknown>) as Record<string, unknown>;
     const style = CompositionStyleSchema.parse(data.style);
@@ -404,143 +421,13 @@ export async function runStyleEditorPipeline(
   }
 }
 
-/**
- * Run the scene-enhancer pipeline to optimize visual descriptions for Veo.
- * Takes raw scenes and returns enhanced prompts optimized for AI video generation.
- */
-export async function runSceneEnhancerPipeline(
-  scenes: Scene[],
-  onToken?: (token: string) => void
-): Promise<{ scene_number: number; enhanced_prompt: string; negative_prompt: string; style_preset: string }[]> {
-  const rc = await getRocketRideClient();
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-  const pipeline = loadPipeline("scene-enhancer.pipe");
-  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
-    throw new Error(
-      `[RocketRide] Failed to start scene-enhancer pipeline: ${err instanceof Error ? err.message : err}`
-    );
-  });
-
-  activePipelines++;
-  try {
-    try { onToken?.(token); } catch (cbErr) {
-      console.warn("[RocketRide] onToken callback threw:", cbErr);
-    }
-
-    const input = JSON.stringify({
-      scenes: scenes.map(s => ({
-        scene_number: s.scene_number,
-        visual_description: s.visual_description,
-        camera_direction: s.camera_direction,
-        mood: s.mood,
-        duration_seconds: s.duration_seconds,
-      })),
-    });
-
-    const result = await withTimeout(
-      rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
-      SEND_TIMEOUT_MS,
-      "Scene enhancement"
-    );
-
-    if (!result) {
-      throw new Error("[RocketRide] Scene enhancer pipeline returned no result");
-    }
-
-    const data = extractResultData(result as Record<string, unknown>) as Record<string, unknown>;
-    const enhanced = (data.enhanced_scenes ?? data) as { scene_number: number; enhanced_prompt: string; negative_prompt: string; style_preset: string }[];
-
-    if (!Array.isArray(enhanced)) {
-      throw new Error("[RocketRide] Scene enhancer returned non-array result");
-    }
-
-    return enhanced;
-  } finally {
-    activePipelines--;
-    await safeTerminate(rc, token);
-  }
-}
-
-export interface QualityReviewResult {
-  passed: boolean;
-  quality_score: number;
-  scores: {
-    narrative: number;
-    visual_feasibility: number;
-    pacing: number;
-    consistency: number;
-    technical: number;
-  };
-  issues: string[];
-  suggestions: string[];
-  revised_script?: Script;
-}
-
-/**
- * Run the quality-review pipeline to evaluate a script before video generation.
- * Returns a quality assessment and optionally a revised script if it fails.
- */
-export async function runQualityReviewPipeline(
-  script: Script,
-  onToken?: (token: string) => void
-): Promise<QualityReviewResult> {
-  const rc = await getRocketRideClient();
-
-  const pipeline = loadPipeline("quality-review.pipe");
-  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
-    throw new Error(
-      `[RocketRide] Failed to start quality-review pipeline: ${err instanceof Error ? err.message : err}`
-    );
-  });
-
-  activePipelines++;
-  try {
-    try { onToken?.(token); } catch (cbErr) {
-      console.warn("[RocketRide] onToken callback threw:", cbErr);
-    }
-
-    const input = `Review this video script for quality before it enters the video generation pipeline:\n\n${JSON.stringify(script, null, 2)}\n\nReturn JSON with: passed (boolean), quality_score (1-10), scores (narrative, visual_feasibility, pacing, consistency, technical), issues (array), suggestions (array), revised_script (only if passed is false).`;
-
-    const result = await withTimeout(
-      rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
-      SEND_TIMEOUT_MS,
-      "Quality review"
-    );
-
-    if (!result) {
-      throw new Error("[RocketRide] Quality review pipeline returned no result");
-    }
-
-    const data = extractResultData(result as Record<string, unknown>) as QualityReviewResult;
-
-    // If review failed and a revised script was provided, validate it
-    if (!data.passed && data.revised_script) {
-      try {
-        data.revised_script = ScriptSchema.parse(data.revised_script);
-      } catch {
-        // Revised script failed validation — remove it
-        delete data.revised_script;
-      }
-    }
-
-    return data;
-  } finally {
-    activePipelines--;
-    await safeTerminate(rc, token);
-  }
-}
-
-/**
- * Terminate a running RocketRide pipeline task.
- */
 export async function terminateTask(token: string): Promise<void> {
   const rc = await getRocketRideClient();
   await withTimeout(rc.terminate(token), TERMINATE_TIMEOUT_MS, "Pipeline termination");
 }
 
-/**
- * Gracefully disconnect the RocketRide client.
- */
 export async function disconnect(): Promise<void> {
   if (activePipelines > 0) {
     console.warn(`[RocketRide] disconnect() called with ${activePipelines} active pipelines`);

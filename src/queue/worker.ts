@@ -120,31 +120,38 @@ export async function processJob(
   engine: GenerationEngine = "auto"
 ): Promise<void> {
   try {
-    // Stage 1: Generate script (5-15%)
+    // Stage 1: Generate + Review + Enhance script via Video Master Pipeline (5-15%)
+    // One RocketRide pipeline call replaces 3 serial calls:
+    //   Generate Script → Quality Review → Select Best → Enhance for Veo
     await updateJobPersistent(jobId, {
       stage: "generating_script",
       progress: 5,
-      message: "Generating script with Gemini...",
+      message: "Running video master pipeline (generate → review → enhance)...",
     });
 
-    // Try RocketRide pipeline first, fall back to direct Gemini on connection errors only
     let script;
     try {
       try {
-        const { runScriptPipeline } = await import("@/lib/rocketride");
-        script = await runScriptPipeline(prompt, sceneCount, (token: string) => {
-          // Synchronous — must stay sync to avoid race with cancel endpoint
+        const { runVideoMasterPipeline } = await import("@/lib/rocketride");
+        const masterResult = await runVideoMasterPipeline(prompt, sceneCount, (token: string) => {
           updateJob(jobId, { rocketrideToken: token });
         });
-        console.log(`[RocketRide] Script generated via pipeline for job ${jobId}`);
+        script = masterResult.script;
+        // Merge enhanced Veo prompts back into the script
+        for (const ep of masterResult.enhanced_scenes) {
+          const scene = script.scenes.find(s => s.scene_number === ep.scene_number);
+          if (scene && ep.enhanced_prompt) {
+            scene.visual_description = ep.enhanced_prompt;
+          }
+        }
+        console.log(`[RocketRide] Video master pipeline complete for job ${jobId}: script generated, reviewed, and enhanced in one call (${masterResult.enhanced_scenes.length} scenes enhanced)`);
       } catch (rrError) {
-        // Only fall back for connection/network errors — not for schema or parse errors
         const isDataError = rrError instanceof SyntaxError
-          || (rrError && typeof rrError === "object" && "issues" in rrError); // ZodError
+          || (rrError && typeof rrError === "object" && "issues" in rrError);
         if (isDataError) throw rrError;
 
         console.warn(
-          `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
+          `[RocketRide] Master pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
         );
         script = await generateScript(prompt, sceneCount);
       }
@@ -153,53 +160,10 @@ export async function processJob(
     }
 
     checkCancelled(jobId);
-
-    // Quality review via RocketRide (non-blocking — uses revised script if quality fails)
-    try {
-      const { runQualityReviewPipeline } = await import("@/lib/rocketride");
-      await updateJobPersistent(jobId, { progress: 10, message: "Reviewing script quality..." });
-      const review = await runQualityReviewPipeline(script, (token: string) => {
-        updateJob(jobId, { rocketrideToken: token });
-      });
-      updateJob(jobId, { rocketrideToken: undefined });
-      console.log(`[QualityReview] Score: ${review.quality_score}/10, passed: ${review.passed}`);
-      if (!review.passed && review.revised_script) {
-        console.log(`[QualityReview] Using revised script (original score: ${review.quality_score})`);
-        script = review.revised_script;
-      }
-      if (review.suggestions.length > 0) {
-        console.log(`[QualityReview] Suggestions: ${review.suggestions.join("; ")}`);
-      }
-    } catch (qrError) {
-      updateJob(jobId, { rocketrideToken: undefined });
-      console.warn(`[QualityReview] Skipped: ${qrError instanceof Error ? qrError.message : qrError}`);
-    }
-
-    // Scene enhancement via RocketRide (non-blocking — enhances visual descriptions for Veo)
-    try {
-      const { runSceneEnhancerPipeline } = await import("@/lib/rocketride");
-      await updateJobPersistent(jobId, { progress: 12, message: "Enhancing scenes for video generation..." });
-      const enhanced = await runSceneEnhancerPipeline(script.scenes, (token: string) => {
-        updateJob(jobId, { rocketrideToken: token });
-      });
-      updateJob(jobId, { rocketrideToken: undefined });
-      // Merge enhanced prompts back into the script scenes
-      for (const ep of enhanced) {
-        const scene = script.scenes.find(s => s.scene_number === ep.scene_number);
-        if (scene && ep.enhanced_prompt) {
-          scene.visual_description = ep.enhanced_prompt;
-        }
-      }
-      console.log(`[SceneEnhancer] Enhanced ${enhanced.length} scenes for Veo`);
-    } catch (seError) {
-      updateJob(jobId, { rocketrideToken: undefined });
-      console.warn(`[SceneEnhancer] Skipped: ${seError instanceof Error ? seError.message : seError}`);
-    }
-
     await updateJobPersistent(jobId, {
       script,
       progress: 15,
-      message: "Script generated and optimized",
+      message: "Script generated, reviewed, and enhanced",
     });
 
     // Stage 2: Generate video clips + Nano Banan assets in parallel (15-55%)
@@ -994,11 +958,26 @@ async function processEditorialJob(
           `Write in a premium editorial voice — confident, specific, vivid. This will be turned into a motion graphics video.`,
         ].filter(Boolean).join("\n");
 
-        const analysisResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: analysisPrompt,
-        });
-        const analysis = analysisResponse.text ?? "";
+        // Route analysis through RocketRide GitHub Analysis Pipeline
+        let analysis = "";
+        try {
+          const { runGitHubAnalysisPipeline } = await import("@/lib/rocketride");
+          analysis = await runGitHubAnalysisPipeline(analysisPrompt, (token) => {
+            updateJob(jobId, { rocketrideToken: token });
+          });
+          updateJob(jobId, { rocketrideToken: undefined });
+          console.log(`[RocketRide] GitHub analysis via pipeline for job ${jobId}`);
+        } catch (rrError) {
+          updateJob(jobId, { rocketrideToken: undefined });
+          console.warn(`[RocketRide] GitHub analysis pipeline unavailable, using direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`);
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+          const analysisResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: analysisPrompt,
+          });
+          analysis = analysisResponse.text ?? "";
+        }
 
         // Combine everything into the enriched prompt
         const meta = await fetchGitHubMetadata(ghParsed.owner, ghParsed.repo);
@@ -1090,14 +1069,14 @@ async function processEditorialJob(
     try {
       const { buildLLMPlanningPrompt } = await import("@/editorial/engine");
       const { resolveEditorialSource } = await import("@/editorial/source");
-      const { runEditorialBrainPipeline } = await import("@/lib/rocketride");
+      const { runEditorialMasterPipeline } = await import("@/lib/rocketride");
 
       const source = resolveEditorialSource(enrichedPrompt);
-      llmPlanResult = await runEditorialBrainPipeline(
+      llmPlanResult = await runEditorialMasterPipeline(
         buildLLMPlanningPrompt(source),
         (token) => { updateJob(jobId, { rocketrideToken: token }); }
       );
-      console.log(`[Editorial] LLM brain plan generated via RocketRide for job ${jobId}`);
+      console.log(`[Editorial] Master editorial pipeline complete (analyze→plan→refine) for job ${jobId}`);
     } catch (rrError) {
       console.warn(
         `[Editorial] RocketRide brain unavailable, using rule-based planning: ${rrError instanceof Error ? rrError.message : rrError}`

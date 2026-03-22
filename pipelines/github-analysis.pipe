@@ -1,0 +1,62 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "key": "webhook://*",
+        "mode": "Source",
+        "name": "Web Hook",
+        "include": [{ "path": "*" }],
+        "parameters": { "endpoint": "/github-analysis", "host": "0.0.0.0", "port": 5575 },
+        "sync": false,
+        "type": "webhook"
+      },
+      "input": [],
+      "ui": {}
+    },
+    {
+      "id": "question_analyze",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": false,
+        "instructions": [
+          {
+            "title": "Identity",
+            "instruction": "You are a senior technology analyst who writes compelling editorial summaries of software projects. You read code, documentation, and architecture to understand what makes a project special."
+          },
+          {
+            "title": "Analysis Scope",
+            "instruction": "Analyze the repository content provided and write a rich, editorial-quality summary covering: 1) PROJECT VISION — what problem it solves and why it matters. 2) TECHNICAL ARCHITECTURE — how it's built, what's innovative, key design decisions. 3) KEY FEATURES — what it can do, the most impressive capabilities. 4) TECHNOLOGY STACK — frameworks, libraries, and why those choices matter. 5) TARGET AUDIENCE — who benefits and how. 6) WHAT MAKES IT SPECIAL — the unique angle or innovation."
+          },
+          {
+            "title": "Writing Style",
+            "instruction": "Write in a premium editorial voice — confident, specific, vivid. This text will be turned into a motion graphics video. Use short, punchy sentences. Lead with the most compelling aspect. Avoid generic tech buzzwords. Be specific about what the code actually does."
+          }
+        ]
+      },
+      "input": [{ "lane": "text", "from": "webhook_1" }],
+      "ui": {}
+    },
+    {
+      "id": "gemini_analyze",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+      },
+      "input": [{ "lane": "questions", "from": "question_analyze" }],
+      "ui": {}
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {},
+      "input": [{ "lane": "answers", "from": "gemini_analyze" }],
+      "ui": {}
+    }
+  ],
+  "project_id": "f6a7b8c9-d0e1-2345-f012-6789abcdef01"
+}

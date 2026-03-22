@@ -1,0 +1,134 @@
+{
+  "source": "webhook_1",
+  "components": [
+    {
+      "id": "webhook_1",
+      "provider": "webhook",
+      "config": {
+        "key": "webhook://*",
+        "mode": "Source",
+        "name": "Web Hook",
+        "include": [{ "path": "*" }],
+        "parameters": { "endpoint": "/editorial-master", "host": "0.0.0.0", "port": 5574 },
+        "sync": false,
+        "type": "webhook"
+      },
+      "input": [],
+      "ui": {}
+    },
+    {
+      "id": "question_analyze",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Identity",
+            "instruction": "You are a content strategist who performs deep analysis of source material to extract narrative potential. You find the story inside any content — code, products, ideas, brands."
+          },
+          {
+            "title": "Analysis Dimensions",
+            "instruction": "Extract: 1) CORE MESSAGE — the single most important thing to communicate, in one sentence. 2) EMOTIONAL HOOKS — 3-5 moments of tension, surprise, pride, or wonder in the material. 3) VISUAL OPPORTUNITIES — concrete objects, metaphors, or scenes that could be shown. 4) NARRATIVE ARC — the natural story structure (problem→solution, past→future, small→big). 5) AUDIENCE — who cares about this and why. 6) KEYWORDS — 5-8 words that capture the essence."
+          },
+          {
+            "title": "Output Format",
+            "instruction": "Return JSON: { core_message, emotional_hooks: string[], visual_opportunities: string[], narrative_arc: string, audience: string, keywords: string[], tone: string, visual_anchor: string }. The visual_anchor is the ONE image that would represent this content if you could only show one thing."
+          }
+        ]
+      },
+      "input": [{ "lane": "text", "from": "webhook_1" }],
+      "ui": {}
+    },
+    {
+      "id": "gemini_analyze",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+      },
+      "input": [{ "lane": "questions", "from": "question_analyze" }],
+      "ui": {}
+    },
+    {
+      "id": "question_plan",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Identity",
+            "instruction": "You are a motion graphics art director who plans editorial videos. You think in visual beats — moments of text, image, and negative space. Your work is inspired by Apple product films and premium magazine layouts animated for screen."
+          },
+          {
+            "title": "Beat Architecture",
+            "instruction": "Using the content analysis provided, plan 5-8 beat directives. Each directive: id (unique string), role (hook|hero|detail|contrast|close|breather), rhythm (whisper: scattered text, hold: sustained text+image, reveal: text+image with motion, contrast: split layout, blank: breathing room), copyFragments (array, MAX 4 words each), durationSec (3-8), granularity (phrase|word|letter), layoutHint (center|hero-top|gallery-left|gallery-right|full-bleed|contrast-split), transitionHint (gentle|crisp|glide|lift), assetRole (hero_object|detail_crop|context_frame|closing_object — required for hold/reveal/contrast rhythms)."
+          },
+          {
+            "title": "Pacing Rules",
+            "instruction": "Open with short hook (3-4s). Give hero the most time (6-8s). Alternate longer holds and shorter beats. End with lingering close (5-7s). Include at least one breather (blank, 3-4s). Total: 30-45 seconds."
+          },
+          {
+            "title": "Output Format",
+            "instruction": "Return JSON: { intent: { promise, tone, visualAnchor, audience }, orderedSectionIds: string[], directives: [...] }. No markdown, pure JSON only."
+          }
+        ]
+      },
+      "input": [{ "lane": "answers", "from": "gemini_analyze" }],
+      "ui": {}
+    },
+    {
+      "id": "gemini_plan",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+      },
+      "input": [{ "lane": "questions", "from": "question_plan" }],
+      "ui": {}
+    },
+    {
+      "id": "question_refine",
+      "provider": "question",
+      "config": {
+        "profile": "default",
+        "expectJson": true,
+        "instructions": [
+          {
+            "title": "Identity",
+            "instruction": "You are a copy editor and motion timing specialist. You refine editorial beat plans for maximum visual and emotional impact."
+          },
+          {
+            "title": "Refinement Tasks",
+            "instruction": "Review the editorial plan and: 1) Polish copyFragments — make every word earn its place, prefer strong single words over weak phrases. 2) Fix rhythm variety — ensure no two adjacent beats use the same rhythm. 3) Verify pacing — total should be 30-45 seconds, no single beat over 8s. 4) Check role distribution — must have at least one hook, one hero, one close. 5) Ensure assetRole is set for all non-whisper, non-blank beats. 6) Vary granularity — don't use the same granularity for every beat."
+          },
+          {
+            "title": "Output",
+            "instruction": "Return the REFINED plan in the exact same JSON structure: { intent, orderedSectionIds, directives }. Apply your improvements directly — do not describe them, just make them. Pure JSON, no explanation."
+          }
+        ]
+      },
+      "input": [{ "lane": "answers", "from": "gemini_plan" }],
+      "ui": {}
+    },
+    {
+      "id": "gemini_refine",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": { "apikey": "${ROCKETRIDE_APIKEY_GEMINI}" }
+      },
+      "input": [{ "lane": "questions", "from": "question_refine" }],
+      "ui": {}
+    },
+    {
+      "id": "response_1",
+      "provider": "response",
+      "config": {},
+      "input": [{ "lane": "answers", "from": "gemini_refine" }],
+      "ui": {}
+    }
+  ],
+  "project_id": "e5f6a7b8-c9d0-1234-ef01-56789abcdef0"
+}
