@@ -28,15 +28,22 @@ const pendingInputs: Map<number, PendingInput> =
 // -- Telegram API helpers --
 
 async function sendMessage(chatId: number, text: string, extra?: Record<string, unknown>) {
-  try {
-    await fetch(`${API_BASE}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (err) {
-    console.warn("sendMessage failed:", err);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await fetch(`${API_BASE}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      return;
+    } catch (err) {
+      if (attempt === 3) {
+        console.warn("sendMessage failed after 3 attempts:", err);
+      } else {
+        await new Promise((r) => setTimeout(r, attempt * 1000));
+      }
+    }
   }
 }
 
