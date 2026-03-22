@@ -97,7 +97,11 @@ try {
 console.log("[4/4] Running video-script pipeline with text/plain...");
 try {
   const pipelinePath = path.resolve("pipelines/video-script.pipe");
-  const { token } = await client.use({ filepath: pipelinePath });
+  // Resolve ${VAR} placeholders client-side — engine does not substitute env vars in filepath mode
+  const pipeline = JSON.parse(
+    readFileSync(pipelinePath, "utf-8").replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_, k) => process.env[k] ?? "")
+  );
+  const { token } = await client.use({ pipeline });
   console.log(`  Pipeline started, token: ${token.slice(0, 20)}...`);
 
   const input = "Create a video script with exactly 3 scenes for: A cat learning to code.\n\nReturn a JSON object with: title, theme, target_audience, music_prompt, scenes (array with scene_number, title, visual_description, narration_text, duration_seconds, camera_direction, mood, transition), total_duration_seconds.";

@@ -252,7 +252,15 @@ export async function runTemplateContentPipeline(
       : sourceType === "github" ? "GitHub repository information"
       : "user prompt";
 
-    const input = `Generate video content for a "${templateId}" template from the following ${sourceLabel}:\n\n${sourceContent}\n\nReturn ONLY valid JSON matching the ${templateId} template schema.`;
+    const TEMPLATE_SCHEMAS_HINT: Record<string, string> = {
+      "product-launch": `{"brandName":"string","tagline":"string (max 12 words, punchy hook)","productImages":[],"features":["string","string","string"],"brandColor":"#hexcolor","logoUrl":""}`,
+      "explainer": `{"title":"string","steps":[{"title":"string","description":"string","iconUrl":""}],"conclusion":"string","introNarration":"string","summaryNarration":"string"}`,
+      "social-promo": `{"hook":"string (3-6 words)","productImage":"","features":["string","string","string"],"cta":"string (2-4 words)","aspectRatio":"9:16"}`,
+      "brand-story": `{"companyName":"string","mission":"string","teamPhotos":[],"milestones":[{"year":"string","event":"string"}],"vision":"string","logoUrl":""}`,
+    };
+
+    const schemaHint = TEMPLATE_SCHEMAS_HINT[templateId] ?? "";
+    const input = `Generate video content for a "${templateId}" template from the following ${sourceLabel}:\n\n${sourceContent}\n\nReturn ONLY a valid JSON object with EXACTLY this structure (no extra fields, no wrapping object):\n${schemaHint}`;
 
     const result = await withTimeout(
       rc.send(token, input, { name: "prompt.txt" }, "text/plain"),
