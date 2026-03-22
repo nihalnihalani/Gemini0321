@@ -973,7 +973,7 @@ async function processEditorialJob(
           const { GoogleGenAI } = await import("@google/genai");
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
           const analysisResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.1-pro-preview",
             contents: analysisPrompt,
           });
           analysis = analysisResponse.text ?? "";
@@ -1152,7 +1152,7 @@ async function processEditorialJob(
       const imageResults = await Promise.allSettled(
         assetPrompts.map(async (ap) => {
           const response = await ai.models.generateContent({
-            model: "gemini-3-pro-image-preview",
+            model: "gemini-3.1-flash-image-preview",
             contents: ap.prompt,
             config: { responseModalities: ["IMAGE"] },
           });
