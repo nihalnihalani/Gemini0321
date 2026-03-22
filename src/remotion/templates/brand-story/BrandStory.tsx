@@ -10,11 +10,11 @@ import { BackgroundMusic } from "../shared";
 
 const FPS = 30;
 
-// Scene durations in frames
-const OPENING_DURATION = 5 * FPS;           // 5s
-const MILESTONE_DURATION_PER = 2 * FPS;     // 2s per milestone (60 frames)
-const TEAM_DURATION = 4 * FPS;              // 4s
-const VISION_DURATION = 5 * FPS;            // 5s
+// Scene durations in frames — generous timing for cinematic pacing
+const OPENING_DURATION = 6 * FPS;           // 6s — slow reveal needs breathing room
+const MILESTONE_DURATION_PER = 2.5 * FPS;   // 2.5s per milestone (75 frames) — deliberate pace
+const TEAM_DURATION = 6 * FPS;              // 6s — Ken Burns effect needs time to read
+const VISION_DURATION = 7 * FPS;            // 7s — climactic finale deserves weight
 
 export const BrandStory: React.FC<z.infer<typeof BrandStorySchema>> = ({
   companyName,
@@ -32,7 +32,7 @@ export const BrandStory: React.FC<z.infer<typeof BrandStorySchema>> = ({
   );
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#1a1510" }}>
+    <AbsoluteFill style={{ backgroundColor: "#0f0c08" }}>
       <Series>
         {/* Opening: company name + mission with cinematic feel */}
         <Series.Sequence durationInFrames={OPENING_DURATION}>
