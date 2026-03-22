@@ -121,7 +121,9 @@ export async function processJob(
     // Try RocketRide pipeline first, fall back to direct Gemini
     let script;
     try {
-      script = await runScriptPipeline(prompt, sceneCount);
+      script = await runScriptPipeline(prompt, sceneCount, (token) => {
+        updateJob(jobId, { rocketrideToken: token });
+      });
       console.log(`[RocketRide] Script generated via pipeline for job ${jobId}`);
     } catch (rrError) {
       console.warn(
@@ -129,6 +131,8 @@ export async function processJob(
       );
       script = await generateScript(prompt, sceneCount);
     }
+    // Clear token after pipeline completes
+    updateJob(jobId, { rocketrideToken: undefined });
 
     await updateJobPersistent(jobId, {
       script,
@@ -516,7 +520,9 @@ async function processTemplateJob(
     // Try RocketRide pipeline first, fall back to direct Gemini
     let templateContent: TemplateInput;
     try {
-      templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType);
+      templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token) => {
+        updateJob(jobId, { rocketrideToken: token });
+      });
       console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);
     } catch (rrError) {
       console.warn(
@@ -524,6 +530,8 @@ async function processTemplateJob(
       );
       templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
     }
+    // Clear token after pipeline completes
+    updateJob(jobId, { rocketrideToken: undefined });
 
     // Merge user-provided assets into template content
     const enrichedContent = { ...templateContent } as Record<string, unknown>;

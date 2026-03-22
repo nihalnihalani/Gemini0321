@@ -58,17 +58,40 @@ export async function getRocketRideClient(): Promise<RocketRideClient> {
 }
 
 /**
+ * Extract structured data from a pipeline result.
+ * Handles multiple response shapes: answers array, data field, or raw result.
+ */
+function extractResultData(result: Record<string, unknown>): unknown {
+  const answers = result.answers;
+  if (Array.isArray(answers) && answers.length > 0) {
+    return typeof answers[0] === "string" ? JSON.parse(answers[0]) : answers[0];
+  }
+  if (result.data) {
+    return typeof result.data === "string" ? JSON.parse(result.data as string) : result.data;
+  }
+  return result;
+}
+
+/**
  * Run the video-script pipeline to generate a structured Script.
  * Sends prompt + sceneCount to the pipeline, returns parsed Script.
+ *
+ * @param onToken — called with the pipeline token immediately after `use()`,
+ *                  so the caller can store it for cancellation before the
+ *                  long-running `send()` begins.
  */
 export async function runScriptPipeline(
   prompt: string,
-  sceneCount: number
+  sceneCount: number,
+  onToken?: (token: string) => void
 ): Promise<Script> {
   const rc = await getRocketRideClient();
 
   const pipelinePath = path.join(PIPELINE_DIR, "video-script.pipe");
   const { token } = await rc.use({ filepath: pipelinePath });
+
+  // Let the caller capture the token for cancellation support
+  onToken?.(token);
 
   try {
     const input = JSON.stringify({ prompt, sceneCount });
@@ -78,21 +101,7 @@ export async function runScriptPipeline(
       throw new Error("RocketRide pipeline returned no result");
     }
 
-    // Extract the answer from the pipeline result
-    const answers = (result as Record<string, unknown>).answers;
-    let scriptData: unknown;
-
-    if (Array.isArray(answers) && answers.length > 0) {
-      scriptData = typeof answers[0] === "string" ? JSON.parse(answers[0]) : answers[0];
-    } else if ((result as Record<string, unknown>).data) {
-      const data = (result as Record<string, unknown>).data;
-      scriptData = typeof data === "string" ? JSON.parse(data) : data;
-    } else {
-      // Try parsing the whole result
-      scriptData = result;
-    }
-
-    return ScriptSchema.parse(scriptData);
+    return ScriptSchema.parse(extractResultData(result as Record<string, unknown>));
   } finally {
     await rc.terminate(token).catch(() => {});
   }
@@ -100,16 +109,21 @@ export async function runScriptPipeline(
 
 /**
  * Run the template-content pipeline to generate template-specific content.
+ *
+ * @param onToken — called with the pipeline token immediately after `use()`.
  */
 export async function runTemplateContentPipeline(
   templateId: TemplateId,
   sourceContent: string,
-  sourceType: SourceType = "prompt"
+  sourceType: SourceType = "prompt",
+  onToken?: (token: string) => void
 ): Promise<TemplateInput> {
   const rc = await getRocketRideClient();
 
   const pipelinePath = path.join(PIPELINE_DIR, "template-content.pipe");
   const { token } = await rc.use({ filepath: pipelinePath });
+
+  onToken?.(token);
 
   try {
     const input = JSON.stringify({ templateId, sourceContent, sourceType });
@@ -119,19 +133,7 @@ export async function runTemplateContentPipeline(
       throw new Error("RocketRide pipeline returned no result");
     }
 
-    const answers = (result as Record<string, unknown>).answers;
-    let contentData: unknown;
-
-    if (Array.isArray(answers) && answers.length > 0) {
-      contentData = typeof answers[0] === "string" ? JSON.parse(answers[0]) : answers[0];
-    } else if ((result as Record<string, unknown>).data) {
-      const data = (result as Record<string, unknown>).data;
-      contentData = typeof data === "string" ? JSON.parse(data) : data;
-    } else {
-      contentData = result;
-    }
-
-    return contentData as TemplateInput;
+    return extractResultData(result as Record<string, unknown>) as TemplateInput;
   } finally {
     await rc.terminate(token).catch(() => {});
   }
