@@ -379,17 +379,14 @@ export async function processJob(
     };
 
     try {
-      const musicPath = await generateMusic(script.music_prompt, {
-        durationSeconds: script.total_duration_seconds,
-        mood: script.scenes[0]?.mood,
-      });
-      const musicKey = generateKey(jobId, "music.wav");
+      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
+      const musicKey = generateKey(jobId, "music.mp3");
       const musicUrl = await uploadFile(musicPath, musicKey);
       generatedScript.musicUrl = musicUrl;
-      console.log(`Music generated and uploaded: ${musicUrl}`);
+      console.log(`Music uploaded: ${musicUrl}`);
     } catch (err) {
       console.error(
-        `Music generation failed: ${err instanceof Error ? err.message : err}`
+        `Music upload failed: ${err instanceof Error ? err.message : err}`
       );
     }
 
@@ -535,15 +532,12 @@ async function processTemplateJob(
 
     let musicUrl: string | undefined;
     try {
-      const musicPath = await generateMusic(moodMap[templateId], {
-        durationSeconds: template.defaultDurationSeconds,
-        mood: moodMap[templateId],
-      });
-      const musicKey = generateKey(jobId, "music.wav");
+      const musicPath = "/Users/charlie/Downloads/product-launch-advertising-commercial-music-301409.mp3";
+      const musicKey = generateKey(jobId, "music.mp3");
       musicUrl = await uploadFile(musicPath, musicKey);
-      console.log(`Music generated and uploaded: ${musicUrl}`);
+      console.log(`Music uploaded: ${musicUrl}`);
     } catch (err) {
-      console.error(`Music generation failed: ${err instanceof Error ? err.message : err}`);
+      console.error(`Music upload failed: ${err instanceof Error ? err.message : err}`);
     }
 
     await updateJobPersistent(jobId, {
