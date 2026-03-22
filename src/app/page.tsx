@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PromptInput from "@/components/PromptInput";
 import TemplatePicker from "@/components/TemplatePicker";
+import EngineSelector from "@/components/EngineSelector";
 import AssetUploader from "@/components/AssetUploader";
 import Navbar from "@/components/Navbar";
-import type { TemplateId } from "@/lib/types";
+import type { TemplateId, GenerationEngine } from "@/lib/types";
 
 export default function Home() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState<TemplateId>("product-launch");
   const [assets, setAssets] = useState<string[]>([]);
+  const [engine, setEngine] = useState<GenerationEngine>("auto");
 
   async function handleSubmit(
     prompt: string,
@@ -32,6 +34,7 @@ export default function Home() {
           resolution,
           sceneCount,
           templateId,
+          engine,
           sourceType: source?.type ?? "prompt",
           sourceUrl: source?.url,
           assets: assets.length > 0 ? assets : undefined,
@@ -94,6 +97,12 @@ export default function Home() {
           style={{ animationFillMode: "forwards" }}
         >
           <PromptInput onSubmit={handleSubmit} isLoading={isLoading} />
+
+          <EngineSelector
+            selected={engine}
+            onChange={setEngine}
+            disabled={isLoading}
+          />
 
           <p
             className="text-label-md opacity-0 animate-fade-in-up delay-3"

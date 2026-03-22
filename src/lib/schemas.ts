@@ -105,6 +105,7 @@ export const GenerateRequestSchema = z.object({
   sourceUrl: z.string().optional(),
   assets: z.array(z.string()).optional(),
   enableVeo: z.boolean().optional().default(false),
+  engine: z.enum(["veo3", "nano-banan", "auto"]).optional().default("auto"),
   resolution: z.enum(["720p", "1080p"]).optional().default("720p"),
   sceneCount: z.number().min(3).max(8).optional().default(5),
 });

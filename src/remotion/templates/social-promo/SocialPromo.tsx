@@ -10,11 +10,19 @@ import { BackgroundMusic } from "../shared";
 
 const FPS = 30;
 
-// Scene durations in frames
-const HOOK_DURATION = 2 * FPS;           // 2s - attention grab
-const PRODUCT_FLASH_DURATION = 3 * FPS;  // 3s - product showcase
-const FEATURE_FRAMES_EACH = 30;          // ~1s per feature
-const CTA_DURATION = 3 * FPS;            // 3s - call to action
+// ────────────────────────────────────────────────────────────────
+// Scene durations — tuned for scroll-stopping social pacing.
+//
+// Research shows 71% of retention decisions happen in the first
+// 3 seconds.  The hook must land fast (1.5s).  Features fire at
+// ~0.8s each to match the 2-3s scene-change cadence that keeps
+// attention on dark-feed vertical content.  CTA gets a full 3s
+// for the urgency pulse to land.
+// ────────────────────────────────────────────────────────────────
+const HOOK_DURATION = Math.round(1.5 * FPS);       // 1.5s - fast attention grab
+const PRODUCT_FLASH_DURATION = Math.round(2.5 * FPS); // 2.5s - product showcase
+const FEATURE_FRAMES_EACH = 24;                     // ~0.8s per feature (rapid-fire)
+const CTA_DURATION = 3 * FPS;                       // 3s   - call to action
 
 export const SocialPromo: React.FC<z.infer<typeof SocialPromoSchema>> = ({
   hook,
@@ -28,22 +36,22 @@ export const SocialPromo: React.FC<z.infer<typeof SocialPromoSchema>> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
       <Series>
-        {/* Hook: bold, attention-grabbing text */}
+        {/* Hook: slam-in text with flash + glitch (scroll-stopper) */}
         <Series.Sequence durationInFrames={HOOK_DURATION}>
           <HookScene hook={hook} />
         </Series.Sequence>
 
-        {/* Product Flash: image with feature badges */}
+        {/* Product Flash: floating image with neon glow ring + badges */}
         <Series.Sequence durationInFrames={PRODUCT_FLASH_DURATION}>
           <ProductFlash productImage={productImage} features={features} />
         </Series.Sequence>
 
-        {/* Feature Burst: rapid-fire feature highlights */}
+        {/* Feature Burst: rapid-fire slam-down highlights */}
         <Series.Sequence durationInFrames={featureBurstDuration}>
           <FeatureBurst features={features} />
         </Series.Sequence>
 
-        {/* CTA: call to action with pulsing glow */}
+        {/* CTA: urgency pulse with ring bursts + sweep */}
         <Series.Sequence durationInFrames={CTA_DURATION}>
           <CTAScene cta={cta} />
         </Series.Sequence>
@@ -51,7 +59,12 @@ export const SocialPromo: React.FC<z.infer<typeof SocialPromoSchema>> = ({
 
       {/* Background music across entire composition */}
       {musicUrl && (
-        <BackgroundMusic src={musicUrl} volume={0.3} fadeInFrames={15} fadeOutFrames={30} />
+        <BackgroundMusic
+          src={musicUrl}
+          volume={0.35}
+          fadeInFrames={10}
+          fadeOutFrames={25}
+        />
       )}
     </AbsoluteFill>
   );
