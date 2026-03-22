@@ -18,6 +18,7 @@ import type {
   TemplateId,
   SourceType,
   TemplateInput,
+  GenerationEngine,
 } from "@/lib/types";
 import { DEFAULT_STYLE } from "@/lib/types";
 
@@ -38,6 +39,7 @@ interface TemplateOptions {
   sourceUrl?: string;
   assets?: string[];
   enableVeo?: boolean;
+  engine?: GenerationEngine;
 }
 
 export function createJob(
@@ -60,11 +62,13 @@ export function createJob(
 
   jobs.set(jobId, status);
 
+  const engine: GenerationEngine = options?.engine ?? "auto";
+
   // Use template pipeline if templateId provided, otherwise legacy
   if (options?.templateId) {
     processTemplateJob(jobId, prompt, resolution, options);
   } else {
-    processJob(jobId, prompt, resolution, sceneCount);
+    processJob(jobId, prompt, resolution, sceneCount, engine);
   }
 
   return jobId;
@@ -102,7 +106,8 @@ export async function processJob(
   jobId: string,
   prompt: string,
   resolution: string,
-  sceneCount: number
+  sceneCount: number,
+  engine: GenerationEngine = "auto"
 ): Promise<void> {
   try {
     // Stage 1: Generate script (5-15%)
@@ -133,43 +138,50 @@ export async function processJob(
       scenes: sceneProgresses,
     });
 
+    const useVeo = engine === "veo3" || engine === "auto";
+    const useNanoBanan = engine === "nano-banan" || engine === "auto";
+
     // Run Veo clip generation and Nano Banan asset generation in parallel
-    const clipGenerationPromise = Promise.allSettled(
-      script.scenes.map(async (scene: Scene) => {
-        // Mark scene as generating
-        const job = jobs.get(jobId);
-        if (job?.scenes) {
-          const sp = job.scenes.find(
-            (s) => s.scene_number === scene.scene_number
+    const clipGenerationPromise = useVeo
+      ? Promise.allSettled(
+          script.scenes.map(async (scene: Scene) => {
+            // Mark scene as generating
+            const job = jobs.get(jobId);
+            if (job?.scenes) {
+              const sp = job.scenes.find(
+                (s) => s.scene_number === scene.scene_number
+              );
+              if (sp) sp.status = "generating";
+              await updateJobPersistent(jobId, { scenes: job.scenes });
+            }
+
+            const clipPath = await generateVideoClip(scene, {
+              resolution: resolution as "720p" | "1080p",
+            });
+
+            // Mark scene as done generating
+            if (job?.scenes) {
+              const sp = job.scenes.find(
+                (s) => s.scene_number === scene.scene_number
+              );
+              if (sp) sp.status = "done";
+              await updateJobPersistent(jobId, { scenes: job.scenes });
+            }
+
+            return { sceneNumber: scene.scene_number, clipPath };
+          })
+        )
+      : Promise.resolve([] as PromiseSettledResult<{ sceneNumber: number; clipPath: string }>[]);
+
+    // Nano Banan asset generation (non-critical in auto mode — failures are tolerated)
+    const nanoBananPromise = useNanoBanan
+      ? generateAllAssets(script).catch((err) => {
+          console.error(
+            `Nano Banan asset generation failed: ${err instanceof Error ? err.message : err}`
           );
-          if (sp) sp.status = "generating";
-          await updateJobPersistent(jobId, { scenes: job.scenes });
-        }
-
-        const clipPath = await generateVideoClip(scene, {
-          resolution: resolution as "720p" | "1080p",
-        });
-
-        // Mark scene as done generating
-        if (job?.scenes) {
-          const sp = job.scenes.find(
-            (s) => s.scene_number === scene.scene_number
-          );
-          if (sp) sp.status = "done";
-          await updateJobPersistent(jobId, { scenes: job.scenes });
-        }
-
-        return { sceneNumber: scene.scene_number, clipPath };
-      })
-    );
-
-    // Nano Banan asset generation (non-critical — failures are tolerated)
-    const nanoBananPromise = generateAllAssets(script).catch((err) => {
-      console.error(
-        `Nano Banan asset generation failed: ${err instanceof Error ? err.message : err}`
-      );
-      return { titleCard: "", keyframes: new Map<number, string>() };
-    });
+          return { titleCard: "", keyframes: new Map<number, string>() };
+        })
+      : Promise.resolve({ titleCard: "", keyframes: new Map<number, string>() });
 
     const [clipResults, nanoBananAssets] = await Promise.all([
       clipGenerationPromise,
