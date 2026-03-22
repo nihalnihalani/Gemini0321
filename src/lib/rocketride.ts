@@ -2,6 +2,7 @@ import { RocketRideClient } from "rocketride";
 import type { Script, TemplateId, SourceType, TemplateInput } from "./types";
 import { ScriptSchema, ProductLaunchInputSchema, ExplainerInputSchema, SocialPromoInputSchema, BrandStoryInputSchema } from "./schemas";
 import type { z } from "zod";
+import { readFileSync } from "fs";
 import path from "path";
 
 let client: RocketRideClient | null = null;
@@ -11,6 +12,23 @@ let activePipelines = 0;
 const PIPELINE_DIR = path.resolve(process.cwd(), "pipelines");
 const SEND_TIMEOUT_MS = 120_000; // 2 minutes max for Gemini response
 const TERMINATE_TIMEOUT_MS = 5_000; // 5 seconds max for cleanup
+
+/**
+ * Load a .pipe file and inject env vars.
+ * The RocketRide engine does NOT resolve ${VAR} or %VAR% in pipeline configs,
+ * so we resolve them client-side before sending the pipeline object.
+ */
+function loadPipeline(filename: string): Record<string, unknown> {
+  const filepath = path.join(PIPELINE_DIR, filename);
+  let content = readFileSync(filepath, "utf-8");
+
+  // Replace ${VAR_NAME} with process.env.VAR_NAME
+  content = content.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_match, varName) => {
+    return process.env[varName] ?? "";
+  });
+
+  return JSON.parse(content);
+}
 
 const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
   "product-launch": ProductLaunchInputSchema,
@@ -172,10 +190,10 @@ export async function runScriptPipeline(
 ): Promise<Script> {
   const rc = await getRocketRideClient();
 
-  const pipelinePath = path.join(PIPELINE_DIR, "video-script.pipe");
-  const { token } = await rc.use({ filepath: pipelinePath }).catch((err: unknown) => {
+  const pipeline = loadPipeline("video-script.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
     throw new Error(
-      `[RocketRide] Failed to load pipeline at "${pipelinePath}": ${err instanceof Error ? err.message : err}`
+      `[RocketRide] Failed to start video-script pipeline: ${err instanceof Error ? err.message : err}`
     );
   });
 
@@ -217,10 +235,10 @@ export async function runTemplateContentPipeline(
 ): Promise<TemplateInput> {
   const rc = await getRocketRideClient();
 
-  const pipelinePath = path.join(PIPELINE_DIR, "template-content.pipe");
-  const { token } = await rc.use({ filepath: pipelinePath }).catch((err: unknown) => {
+  const pipeline = loadPipeline("template-content.pipe");
+  const { token } = await rc.use({ pipeline: pipeline as never }).catch((err: unknown) => {
     throw new Error(
-      `[RocketRide] Failed to load pipeline at "${pipelinePath}": ${err instanceof Error ? err.message : err}`
+      `[RocketRide] Failed to start template-content pipeline: ${err instanceof Error ? err.message : err}`
     );
   });
 
