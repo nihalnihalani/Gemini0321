@@ -203,7 +203,7 @@ const TEMPLATE_SCHEMAS: Record<TemplateId, z.ZodType> = {
  */
 export async function analyzeYouTubeVideo(youtubeUrl: string): Promise<string> {
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-flash",
     contents: [
       {
         role: "user",
@@ -261,7 +261,7 @@ export async function generateTemplateContent(
         : "user prompt";
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-flash",
     contents: `Generate video content from the following ${sourceLabel}:\n\n${sourceContent}`,
     config: {
       systemInstruction: systemPrompt,
@@ -291,7 +291,7 @@ export async function generateScript(
   const jsonSchema = z.toJSONSchema(ScriptSchema, { target: "draft-7" });
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-flash",
     contents: `Create a video script with exactly ${sceneCount} scenes for the following concept:\n\n${prompt}`,
     config: {
       systemInstruction: SYSTEM_PROMPT,

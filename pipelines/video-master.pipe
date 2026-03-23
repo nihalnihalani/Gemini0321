@@ -87,8 +87,8 @@
       "id": "gemini_script",
       "provider": "llm_gemini",
       "config": {
-        "profile": "gemini-3-pro",
-        "gemini-3-pro": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
@@ -155,8 +155,8 @@
       "id": "gemini_review",
       "provider": "llm_gemini",
       "config": {
-        "profile": "gemini-3-pro",
-        "gemini-3-pro": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
@@ -215,8 +215,8 @@
       "id": "gemini_merge",
       "provider": "llm_gemini",
       "config": {
-        "profile": "gemini-3-pro",
-        "gemini-3-pro": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
@@ -279,8 +279,8 @@
       "id": "gemini_enhance",
       "provider": "llm_gemini",
       "config": {
-        "profile": "gemini-3-pro",
-        "gemini-3-pro": {
+        "profile": "gemini-2_5-flash",
+        "gemini-2_5-flash": {
           "apikey": "${ROCKETRIDE_APIKEY_GEMINI}"
         }
       },
