@@ -865,7 +865,11 @@ async function processEditorialJob(
         const { execSync } = await import("child_process");
         const { readFileSync, readdirSync, statSync, existsSync } = await import("fs");
         const cloneDir = `/tmp/editorial-repos/${jobId}`;
-        execSync(`rm -rf ${cloneDir} && git clone --depth 1 https://github.com/${ghParsed.owner}/${ghParsed.repo}.git ${cloneDir}`, {
+        const ghToken = process.env.GITHUB_TOKEN;
+        const cloneUrl = ghToken
+          ? `https://${ghToken}@github.com/${ghParsed.owner}/${ghParsed.repo}.git`
+          : `https://github.com/${ghParsed.owner}/${ghParsed.repo}.git`;
+        execSync(`rm -rf ${cloneDir} && git clone --depth 1 ${cloneUrl} ${cloneDir}`, {
           timeout: 30_000,
           stdio: "pipe",
         });
