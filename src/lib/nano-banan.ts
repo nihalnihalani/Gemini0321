@@ -3,7 +3,7 @@ import { mkdir, access, writeFile } from "fs/promises";
 import path from "path";
 import type { Scene, Script } from "./types";
 
-const MODEL = "gemini-2.5-flash-image";
+const MODEL = "gemini-3.1-flash-image-preview";
 const OUTPUT_DIR = "/tmp/nano-banan";
 
 function isStubMode(): boolean {
