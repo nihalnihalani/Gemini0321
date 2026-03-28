@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 </p>
 
-<h1 align="center">TeleStudio</h1>
+<h1 align="center">FlowMotion</h1>
 <h3 align="center">Autonomous AI Video Agent &mdash; From Telegram Prompt to MP4 in Minutes</h3>
 
 <p align="center">
@@ -36,13 +36,13 @@
 
 ## The Solution
 
-**TeleStudio** democratizes video creation by turning a single Telegram message into a fully composed, production-ready video. A sophisticated multi-model pipeline works completely autonomously behind the scenes, bridging the gap between cutting-edge generative AI and end-user simplicity.
+**FlowMotion** democratizes video creation by turning a single Telegram message into a fully composed, production-ready video. A sophisticated multi-model pipeline works completely autonomously behind the scenes, bridging the gap between cutting-edge generative AI and end-user simplicity.
 
 ### The "3 AM Video Request" Story
 
 > It's 3:00 AM. A founder realizes they need a quick product teaser video for a Product Hunt launch tomorrow morning.
 >
-> They open Telegram and message TeleStudio: *"Generate a 30-second cinematic teaser for a new AI coffee machine set in a futuristic cafe."*
+> They open Telegram and message FlowMotion: *"Generate a 30-second cinematic teaser for a new AI coffee machine set in a futuristic cafe."*
 >
 > Behind the scenes, **Vercel Chat SDK** routes the webhook. **Gemini 2.5 Flash** instantly writes a 4-scene script with exact camera movements and narration. **Veo 3.1** begins rendering breathtaking 4K clips for each scene while **ElevenLabs** generates the voiceover. **Remotion** automatically stitches the clips, overlays text, and renders the final MP4.
 >
@@ -242,5 +242,5 @@ MIT
 ---
 
 <p align="center">
-  <strong>TeleStudio</strong> &mdash; Built for the <a href="https://cerebralvalley.ai/e/zero-to-agent-sf">Zero to Agent: Vercel x DeepMind Hackathon</a> in San Francisco, March 2026.
+  <strong>FlowMotion</strong> &mdash; Built for the <a href="https://cerebralvalley.ai/e/zero-to-agent-sf">Zero to Agent: Vercel x DeepMind Hackathon</a> in San Francisco, March 2026.
 </p>

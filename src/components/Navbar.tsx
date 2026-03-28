@@ -41,7 +41,7 @@ export default function Navbar() {
           className="font-serif font-semibold text-lg"
           style={{ color: "var(--on-surface)" }}
         >
-          TeleStudio
+          FlowMotion
         </span>
       </div>
 
