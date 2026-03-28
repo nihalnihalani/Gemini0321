@@ -17,7 +17,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "AI Video Generator",
+  title: "FlowMotion",
   description:
     "Transform your ideas into cinematic videos with AI. Describe your vision and let Gemini, Veo, and Remotion create it scene by scene.",
 };
