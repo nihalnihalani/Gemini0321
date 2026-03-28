@@ -1,4 +1,4 @@
-import { planEditorialSource, buildRuleBasedPlan, buildLLMPlanningPrompt, buildPlanFromLLMObject } from "./brain";
+import { planEditorialSource } from "./brain";
 import { compileBeatSheetToSpec } from "./compiler";
 import { generateBeatSheetFromPlan } from "./director";
 import { referenceAssets } from "./reference";
@@ -26,7 +26,6 @@ type EngineOptions = {
   textGranularity?: TokenGranularity;
   brainMode?: BrainMode;
   assets?: EditorialAsset[];
-  llmPlanResult?: unknown;
 };
 
 export type EditorialEngineResult = {
@@ -117,16 +116,10 @@ export const buildEditorialEngineResult = async (
   const source = resolveEditorialSource(input);
   const library = getAssetLibrary(options.assets);
 
-  let plan: EditorialPlan;
-  if (options.llmPlanResult) {
-    const fallback = buildRuleBasedPlan(source, { brainMode: "llm" });
-    plan = buildPlanFromLLMObject(source, fallback, options.llmPlanResult);
-  } else {
-    plan = await planEditorialSource(source, {
-      brainMode: options.brainMode,
-      textGranularity: options.textGranularity,
-    });
-  }
+  const plan = await planEditorialSource(source, {
+    brainMode: options.brainMode,
+    textGranularity: options.textGranularity,
+  });
 
   const plannedBeatSheet = generateBeatSheetFromPlan(plan, source);
   const { beatSheet, assets } = assignAssetsToBeatSheet(plannedBeatSheet, source, plan, library);
@@ -157,4 +150,3 @@ export const buildEditorialSpecFromInput = async (
   return result.spec;
 };
 
-export { buildLLMPlanningPrompt };

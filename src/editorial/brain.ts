@@ -158,90 +158,6 @@ const buildRuleBasedPlan = (source: EditorialSource, options: PlanOptions = {}):
   };
 };
 
-export const buildLLMPlanningPrompt = (source: EditorialSource) =>
-  JSON.stringify(
-    {
-      task: "Plan an elegant editorial motion video from this source.",
-      requirements: {
-        beats: "5-8 directives",
-        duration: "30-45 seconds total",
-        style: "restrained, elegant, neat, premium",
-        preserveHierarchy: true,
-        followSourceSections: true,
-        avoidDenseCopy: true,
-      },
-      source,
-    },
-    null,
-    2,
-  );
-
-const parseJsonBlock = (value: string) => {
-  const trimmed = value.trim();
-  const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)```/i);
-  const candidate = fenceMatch?.[1] ?? trimmed;
-  return JSON.parse(candidate);
-};
-
-const buildDirectiveFromUnknown = (value: unknown, fallbackId: string): BeatDirective | null => {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<BeatDirective>;
-  if (!candidate.rhythm || !candidate.role || !Array.isArray(candidate.copyFragments)) return null;
-  return sanitizeDirective({
-    id: candidate.id ?? fallbackId,
-    role: candidate.role,
-    sectionId: candidate.sectionId,
-    rhythm: candidate.rhythm,
-    copyFragments: candidate.copyFragments.map((fragment) => String(fragment)),
-    assetRole: candidate.assetRole,
-    granularity: candidate.granularity,
-    durationSec: typeof candidate.durationSec === "number" ? candidate.durationSec : 5.2,
-    layoutHint: candidate.layoutHint,
-    transitionHint: candidate.transitionHint,
-    sectionTitle: candidate.sectionTitle ? String(candidate.sectionTitle) : undefined,
-    sectionSummary: candidate.sectionSummary ? String(candidate.sectionSummary) : undefined,
-    visualQuery: candidate.visualQuery ? String(candidate.visualQuery) : undefined,
-  });
-};
-
-export const buildPlanFromLLMObject = (
-  source: EditorialSource,
-  fallback: EditorialPlan,
-  payload: unknown,
-): EditorialPlan => {
-  if (!payload || typeof payload !== "object") return fallback;
-  const candidate = payload as { intent?: Partial<EditorialPlan["intent"]>; orderedSectionIds?: string[]; directives?: unknown[] };
-  const directives = (candidate.directives ?? [])
-    .map((directive, index) => buildDirectiveFromUnknown(directive, `directive-llm-${index + 1}`))
-    .filter((directive): directive is BeatDirective => Boolean(directive));
-  if (directives.length < 5 || directives.length > 8) return fallback;
-
-  return {
-    sourceTitle: source.title,
-    sourceKind: source.kind,
-    plannerModel: fallback.plannerModel,
-    brainMode: "llm",
-    intent: {
-      promise: candidate.intent?.promise ?? fallback.intent.promise,
-      tone: candidate.intent?.tone ?? fallback.intent.tone,
-      visualAnchor: candidate.intent?.visualAnchor ?? fallback.intent.visualAnchor,
-      audience: candidate.intent?.audience ?? fallback.intent.audience,
-    },
-    orderedSectionIds:
-      candidate.orderedSectionIds?.filter((id) => source.sections.some((section) => section.id === id)) ??
-      fallback.orderedSectionIds,
-    directives: directives.map((directive) => {
-      const section = source.sections.find((s) => s.id === directive.sectionId);
-      return {
-        ...directive,
-        sectionTitle: directive.sectionTitle ?? section?.title,
-        sectionSummary: directive.sectionSummary ?? section?.summary,
-        visualQuery: directive.visualQuery ?? buildVisualQuery(source, section, directive.role),
-      };
-    }),
-  };
-};
-
 /**
  * Plan an editorial source using rule-based planning.
  */
@@ -252,4 +168,3 @@ export const planEditorialSource = async (
   return buildRuleBasedPlan(source, options);
 };
 
-export { buildRuleBasedPlan };
