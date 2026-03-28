@@ -910,8 +910,6 @@ async function processEditorialJob(
           `Write in a premium editorial voice — confident, specific, vivid. This will be turned into a motion graphics video.`,
         ].filter(Boolean).join("\n");
 
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
         const analysisResponse = await ai.models.generateContent({
           model: "gemini-3.1-pro-preview",
           contents: analysisPrompt,
