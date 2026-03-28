@@ -26,10 +26,6 @@ export async function POST(
     );
   }
 
-  // Capture and clear token synchronously BEFORE any await to prevent TOCTOU race
-  const token = job.rocketrideToken;
-  job.rocketrideToken = undefined;
-
   // Mark as failed synchronously so concurrent requests see the updated state
   Object.assign(job, {
     stage: "failed",
@@ -37,19 +33,6 @@ export async function POST(
     error: "Cancelled by user",
     updatedAt: new Date().toISOString(),
   });
-
-  // Terminate RocketRide pipeline if a token was captured
-  if (token) {
-    try {
-      const { terminateTask } = await import("@/lib/rocketride");
-      await terminateTask(token);
-      console.log(`[RocketRide] Terminated pipeline for job ${jobId}`);
-    } catch (err) {
-      console.warn(
-        `[RocketRide] Failed to terminate pipeline: ${err instanceof Error ? err.message : err}`
-      );
-    }
-  }
 
   return NextResponse.json({ jobId, status: "cancelled" });
 }

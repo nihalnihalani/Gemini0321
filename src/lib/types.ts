@@ -57,7 +57,7 @@ export interface JobStatus {
   previewUrl?: string;
   downloadUrl?: string;
   error?: string;
-  rocketrideToken?: string; // For RocketRide pipeline cancellation
+
   createdAt: string;
   updatedAt: string;
 }

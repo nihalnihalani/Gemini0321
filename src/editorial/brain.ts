@@ -243,21 +243,12 @@ export const buildPlanFromLLMObject = (
 };
 
 /**
- * Plan an editorial source.
- * Uses RocketRide LLM pipeline when brainMode is "llm", with rule-based fallback.
- * The RocketRide integration is handled by the caller (engine.ts) — this function
- * always returns a valid plan.
+ * Plan an editorial source using rule-based planning.
  */
 export const planEditorialSource = async (
   source: EditorialSource,
   options: PlanOptions = {},
 ): Promise<EditorialPlan> => {
-  if (options.brainMode === "llm") {
-    // LLM planning is handled externally via RocketRide pipeline.
-    // If the caller provides an LLM result, it should use buildPlanFromLLMObject() directly.
-    // This path returns the rule-based plan as a baseline.
-    return buildRuleBasedPlan(source, { ...options, brainMode: "llm" });
-  }
   return buildRuleBasedPlan(source, options);
 };
 

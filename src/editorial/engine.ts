@@ -26,7 +26,7 @@ type EngineOptions = {
   textGranularity?: TokenGranularity;
   brainMode?: BrainMode;
   assets?: EditorialAsset[];
-  llmPlanResult?: unknown; // Pre-computed LLM plan result from RocketRide
+  llmPlanResult?: unknown;
 };
 
 export type EditorialEngineResult = {
@@ -117,12 +117,10 @@ export const buildEditorialEngineResult = async (
   const source = resolveEditorialSource(input);
   const library = getAssetLibrary(options.assets);
 
-  // Build plan: use LLM result if provided, otherwise use rule-based
   let plan: EditorialPlan;
   if (options.llmPlanResult) {
     const fallback = buildRuleBasedPlan(source, { brainMode: "llm" });
     plan = buildPlanFromLLMObject(source, fallback, options.llmPlanResult);
-    plan = { ...plan, plannerModel: "rocketride-llm" };
   } else {
     plan = await planEditorialSource(source, {
       brainMode: options.brainMode,

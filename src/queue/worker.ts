@@ -1,5 +1,4 @@
 import { generateScript, generateTemplateContent, analyzeYouTubeVideo } from "@/lib/gemini";
-// rocketride imported dynamically where used to avoid ESM resolution errors
 import { generateVideoClip } from "@/lib/veo";
 import { generateAllAssets } from "@/lib/nano-banan";
 import { generateAllNarrations, generateAllSFX } from "@/lib/elevenlabs";
@@ -120,44 +119,14 @@ export async function processJob(
   engine: GenerationEngine = "auto"
 ): Promise<void> {
   try {
-    // Stage 1: Generate + Review + Enhance script via Video Master Pipeline (5-15%)
-    // One RocketRide pipeline call replaces 3 serial calls:
-    //   Generate Script → Quality Review → Select Best → Enhance for Veo
+    // Stage 1: Generate script via Gemini (5-15%)
     await updateJobPersistent(jobId, {
       stage: "generating_script",
       progress: 5,
-      message: "Running video master pipeline (generate → review → enhance)...",
+      message: "Generating script with Gemini...",
     });
 
-    let script;
-    try {
-      try {
-        const { runVideoMasterPipeline } = await import("@/lib/rocketride");
-        const masterResult = await runVideoMasterPipeline(prompt, sceneCount, (token: string) => {
-          updateJob(jobId, { rocketrideToken: token });
-        });
-        script = masterResult.script;
-        // Merge enhanced Veo prompts back into the script
-        for (const ep of masterResult.enhanced_scenes) {
-          const scene = script.scenes.find(s => s.scene_number === ep.scene_number);
-          if (scene && ep.enhanced_prompt) {
-            scene.visual_description = ep.enhanced_prompt;
-          }
-        }
-        console.log(`[RocketRide] Video master pipeline complete for job ${jobId}: script generated, reviewed, and enhanced in one call (${masterResult.enhanced_scenes.length} scenes enhanced)`);
-      } catch (rrError) {
-        const isDataError = rrError instanceof SyntaxError
-          || (rrError && typeof rrError === "object" && "issues" in rrError);
-        if (isDataError) throw rrError;
-
-        console.warn(
-          `[RocketRide] Master pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
-        );
-        script = await generateScript(prompt, sceneCount);
-      }
-    } finally {
-      updateJob(jobId, { rocketrideToken: undefined });
-    }
+    const script = await generateScript(prompt, sceneCount);
 
     checkCancelled(jobId);
     await updateJobPersistent(jobId, {
@@ -540,28 +509,7 @@ async function processTemplateJob(
       message: "Generating template content with Gemini...",
     });
 
-    // Try RocketRide pipeline first, fall back to direct Gemini on connection errors only
-    let templateContent: TemplateInput;
-    try {
-      try {
-        const { runTemplateContentPipeline } = await import("@/lib/rocketride");
-        templateContent = await runTemplateContentPipeline(templateId, sourceContent, sourceType, (token: string) => {
-          updateJob(jobId, { rocketrideToken: token });
-        });
-        console.log(`[RocketRide] Template content generated via pipeline for job ${jobId}`);
-      } catch (rrError) {
-        const isDataError = rrError instanceof SyntaxError
-          || (rrError && typeof rrError === "object" && "issues" in rrError);
-        if (isDataError) throw rrError;
-
-        console.warn(
-          `[RocketRide] Pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
-        );
-        templateContent = await generateTemplateContent(templateId, sourceContent, sourceType);
-      }
-    } finally {
-      updateJob(jobId, { rocketrideToken: undefined });
-    }
+    const templateContent: TemplateInput = await generateTemplateContent(templateId, sourceContent, sourceType);
 
     // Merge user-provided assets into template content
     const enrichedContent = { ...templateContent } as Record<string, unknown>;
@@ -962,26 +910,13 @@ async function processEditorialJob(
           `Write in a premium editorial voice — confident, specific, vivid. This will be turned into a motion graphics video.`,
         ].filter(Boolean).join("\n");
 
-        // Route analysis through RocketRide GitHub Analysis Pipeline
-        let analysis = "";
-        try {
-          const { runGitHubAnalysisPipeline } = await import("@/lib/rocketride");
-          analysis = await runGitHubAnalysisPipeline(analysisPrompt, (token) => {
-            updateJob(jobId, { rocketrideToken: token });
-          });
-          updateJob(jobId, { rocketrideToken: undefined });
-          console.log(`[RocketRide] GitHub analysis via pipeline for job ${jobId}`);
-        } catch (rrError) {
-          updateJob(jobId, { rocketrideToken: undefined });
-          console.warn(`[RocketRide] GitHub analysis pipeline unavailable, using direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`);
-          const { GoogleGenAI } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-          const analysisResponse = await ai.models.generateContent({
-            model: "gemini-3.1-pro-preview",
-            contents: analysisPrompt,
-          });
-          analysis = analysisResponse.text ?? "";
-        }
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const analysisResponse = await ai.models.generateContent({
+          model: "gemini-3.1-pro-preview",
+          contents: analysisPrompt,
+        });
+        const analysis = analysisResponse.text ?? "";
 
         // Combine everything into the enriched prompt
         const meta = await fetchGitHubMetadata(ghParsed.owner, ghParsed.repo);
@@ -1067,27 +1002,6 @@ async function processEditorialJob(
     });
 
     const { buildEditorialEngineResult } = await import("@/editorial/engine");
-
-    // Try RocketRide LLM brain, fall back to rule-based
-    let llmPlanResult: unknown = undefined;
-    try {
-      const { buildLLMPlanningPrompt } = await import("@/editorial/engine");
-      const { resolveEditorialSource } = await import("@/editorial/source");
-      const { runEditorialMasterPipeline } = await import("@/lib/rocketride");
-
-      const source = resolveEditorialSource(enrichedPrompt);
-      llmPlanResult = await runEditorialMasterPipeline(
-        buildLLMPlanningPrompt(source),
-        (token) => { updateJob(jobId, { rocketrideToken: token }); }
-      );
-      console.log(`[Editorial] Master editorial pipeline complete (analyze→plan→refine) for job ${jobId}`);
-    } catch (rrError) {
-      console.warn(
-        `[Editorial] RocketRide brain unavailable, using rule-based planning: ${rrError instanceof Error ? rrError.message : rrError}`
-      );
-    } finally {
-      updateJob(jobId, { rocketrideToken: undefined });
-    }
 
     checkCancelled(jobId);
     await updateJobPersistent(jobId, {
@@ -1194,8 +1108,7 @@ async function processEditorialJob(
     });
 
     const result = await buildEditorialEngineResult(enrichedPrompt, {
-      brainMode: llmPlanResult ? "llm" : "rule-based",
-      llmPlanResult,
+      brainMode: "rule-based",
       preset: "editorial-generator",
       ...(dynamicAssets.length > 0 ? { assets: dynamicAssets } : {}),
     });

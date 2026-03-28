@@ -45,59 +45,41 @@ export async function POST(request: Request) {
 
     const { instruction, currentStyle } = parsed.data;
 
-    // Try RocketRide style-editor pipeline first, fall back to direct Gemini
-    let result: EditResponse;
-    try {
-      const { runStyleEditorPipeline } = await import("@/lib/rocketride");
-      const rrResult = await runStyleEditorPipeline(instruction, currentStyle);
-      console.log("[RocketRide] Style edit via pipeline");
-      result = { style: rrResult.style, explanation: rrResult.explanation };
-    } catch (rrError) {
-      // Only fall back for connection/network errors — not for schema or parse errors
-      const isDataError = rrError instanceof SyntaxError
-        || (rrError && typeof rrError === "object" && "issues" in rrError);
-      if (isDataError) throw rrError;
+    const jsonSchema = z.toJSONSchema(EditResponseSchema, {
+      target: "draft-7",
+    });
 
-      console.warn(
-        `[RocketRide] Style editor pipeline unavailable, falling back to direct Gemini: ${rrError instanceof Error ? rrError.message : rrError}`
-      );
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: `Current style configuration:\n${JSON.stringify(currentStyle, null, 2)}\n\nUser instruction: ${instruction}`,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        responseJsonSchema: jsonSchema,
+        temperature: 0.2,
+      },
+    });
 
-      const jsonSchema = z.toJSONSchema(EditResponseSchema, {
-        target: "draft-7",
-      });
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: `Current style configuration:\n${JSON.stringify(currentStyle, null, 2)}\n\nUser instruction: ${instruction}`,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          responseMimeType: "application/json",
-          responseJsonSchema: jsonSchema,
-          temperature: 0.2,
-        },
-      });
-
-      const text = response.text;
-      if (!text) {
-        throw new Error("Gemini returned an empty response");
-      }
-
-      const rawResult = JSON.parse(text);
-      const validated = EditResponseSchema.safeParse(rawResult);
-
-      if (!validated.success) {
-        console.error("Gemini response validation failed:", validated.error);
-        return NextResponse.json(
-          { error: "LLM returned an invalid style configuration" },
-          { status: 500 }
-        );
-      }
-
-      result = {
-        style: validated.data.style,
-        explanation: validated.data.explanation,
-      };
+    const text = response.text;
+    if (!text) {
+      throw new Error("Gemini returned an empty response");
     }
+
+    const rawResult = JSON.parse(text);
+    const validated = EditResponseSchema.safeParse(rawResult);
+
+    if (!validated.success) {
+      console.error("Gemini response validation failed:", validated.error);
+      return NextResponse.json(
+        { error: "LLM returned an invalid style configuration" },
+        { status: 500 }
+      );
+    }
+
+    const result: EditResponse = {
+      style: validated.data.style,
+      explanation: validated.data.explanation,
+    };
 
     return NextResponse.json(result);
   } catch (error) {
